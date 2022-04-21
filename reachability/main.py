@@ -17,8 +17,6 @@ from pytope import Polytope
 use_cuda = False  # torch.cuda.is_available()
 device = torch.device("cuda:0" if use_cuda else "cpu")
 torch.backends.cudnn.benchmark = True
-car_xs = [0, 2.5, 2.5, 0]
-car_ys = [-1, -1, 1, 1]
 print(device)
 
 

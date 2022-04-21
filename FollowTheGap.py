@@ -2,17 +2,16 @@ import time
 import gym
 import numpy as np
 import concurrent.futures
-import os
-import sys
 import yaml
 from argparse import Namespace
+from pyglet import shapes
+import reachset_transform.main as transform
 
-# Get ./src/ folder & add it to path
-current_dir = os.path.abspath(os.path.dirname(__file__))
-sys.path.append(current_dir)
+from shapely.geometry import Polygon as shapely_poly
+
+
 
 # import your drivers here
-from drivers import DisparityExtender
 from drivers import GapFollower
 
 # choose your drivers here (1-4)
@@ -31,7 +30,7 @@ class GymRunner(object):
     def run(self):
         # load map
 
-        with open('config_Spielberg_map.yaml') as file:
+        with open('new_config_Spielberg_map.yaml') as file:
             conf_dict = yaml.load(file, Loader=yaml.FullLoader)
         conf = Namespace(**conf_dict)
 
@@ -43,9 +42,7 @@ class GymRunner(object):
         laptime = 0.0
         start = time.time()
 
-
         while not done:
-
             actions = []
             futures = []
             with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -57,7 +54,7 @@ class GymRunner(object):
             actions = np.array(actions)
             obs, step_reward, done, info = env.step(actions)
             laptime += step_reward
-            env.render(mode='human_fast')
+            env.render(mode='human')
 
         print('Sim elapsed time:', laptime, 'Real elapsed time:', time.time() - start)
 

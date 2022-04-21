@@ -9,11 +9,11 @@ import reachset_transform.main as transform
 import numpy as np
 from pytope import Polytope
 
-car_V = np.array([[0.0, -1.0], [2.5, -1.0], [2.5, 1.0], [0.0, 1.0]])
+car_V = np.array([[0, -0.19], [0.58, -0.19], [0.58, 0.19], [0, 0.19]])
 car_poly = Polytope(car_V)
 
-car_xs = [0.0, 2.5, 2.5, 0.0]
-car_ys = [-1.0, -1.0, 1.0, 1.0]
+car_xs = [0, 0.58, 0.58, 0]
+car_ys = [-0.19, -0.19, 0.19, 0.19]
 
 
 def car_points(theta_min, theta_max):
