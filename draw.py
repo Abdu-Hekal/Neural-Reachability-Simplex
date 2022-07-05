@@ -35,9 +35,3 @@ def add_obstacles(obstacles):
         orig_map = new_map
 
 
-
-if __name__ == "__main__":
-    point = un_convert([-43.27495834, 37.9264539])
-    draw_obstacle("Spielberg_map.png", "new_spielberg.png", point)
-    # point = un_convert([0, 0])
-    # draw_obstacle("new_spielberg.png", "new_spielberg.png", point)

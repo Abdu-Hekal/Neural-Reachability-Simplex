@@ -5,20 +5,12 @@ import concurrent.futures
 
 import pyglet
 import yaml
-from argparse import Namespace
-from pyglet import shapes, gl
+from argparse import Namespace, ArgumentParser, ArgumentDefaultsHelpFormatter
 
 import draw
 import reach
-import reachset_transform.main as transform
-
-from shapely.geometry import Polygon as shapely_poly
-
-# import your drivers here
 from MPC_Tracking import LatticePlanner, Controller, State
 from drivers import GapFollower
-from pyglet.window import key
-from pyglet.gl import glTranslatef
 
 # choose your drivers here (1-4)
 drivers = [GapFollower()]
@@ -91,22 +83,24 @@ class GymRunner(object):
                 vertex_list.delete()
             self.vertices_list = None
 
-    def run(self):
+    def run(self, zoom):
         # load map
         self.env.renderer.set_fullscreen(True)
+        self.env.renderer.set_mouse_visible(False)
         start = time.time()
         ftg_laptime = 0
 
         pyglet_label = pyglet.text.Label('{label}'.format(
-                    label='MPC'), font_size=200, x=1000, y=1800, anchor_x='center', anchor_y='center',
-                          color=(255, 255, 255, 255), batch=self.env.renderer.batch)
-        while not self.done:
+            label='MPC'), font_size=200, x=1000, y=1800, anchor_x='center', anchor_y='center',
+            color=(255, 255, 255, 255), batch=self.env.renderer.batch)
 
-            # camera zoomed out
-            # self.env.renderer.bottom = 14 * -460 +1500
-            # self.env.renderer.top = 14 * 460 +1500
-            # self.env.renderer.left = 14 * -560.0
-            # self.env.renderer.right = 14 * 560.0
+        while not self.done and self.env.renderer.alive:
+
+            if not zoom:
+                self.env.renderer.bottom = 7 * -460 +1500
+                self.env.renderer.top = 7 * 460 +1500
+                self.env.renderer.left = 7 * -560.0
+                self.env.renderer.right = 7 * 560.0
 
             if self.control_count == 10:
                 self.rm_plotted_reach_sets()
@@ -119,21 +113,20 @@ class GymRunner(object):
                 actions = self.follow_the_gap()
                 ftg = True
                 ftg_laptime += self.step_reward
-                label = "Gap Follower"
+                label = "Follow the Gap"
                 # time.sleep(0.1)
 
             old_cam_point = [self.obs['poses_x'][0], self.obs['poses_y'][0]]
 
             pyglet_label.text = label
-
             self.obs, self.step_reward, self.done, self.info = self.env.step(actions)
 
             # camera to follow vehicle
-            camera_point = [self.obs['poses_x'][0]-old_cam_point[0], self.obs['poses_y'][0]-old_cam_point[1]]
-            self.env.renderer.bottom += (camera_point[1]*50)
-            self.env.renderer.top += (camera_point[1]*50)
-            self.env.renderer.left += (camera_point[0]*50)
-            self.env.renderer.right += (camera_point[0]*50)
+            camera_point = [self.obs['poses_x'][0] - old_cam_point[0], self.obs['poses_y'][0] - old_cam_point[1]]
+            self.env.renderer.bottom += (camera_point[1] * 50)
+            self.env.renderer.top += (camera_point[1] * 50)
+            self.env.renderer.left += (camera_point[0] * 50)
+            self.env.renderer.right += (camera_point[0] * 50)
 
             self.laptime += self.step_reward
 
@@ -150,8 +143,12 @@ class GymRunner(object):
         print('Sim elapsed time:', self.laptime, 'Real elapsed time:', time.time() - start)
 
 
-
 if __name__ == '__main__':
+    parser = ArgumentParser(description="Settings",
+                            formatter_class=ArgumentDefaultsHelpFormatter)
+    parser.add_argument("-z", "--zoom", action="store_true", help="Zoom in camera")
+    args = vars(parser.parse_args())
+    zoom = args['zoom']
     map_obstacles = [[-58.51379908, 31.52080008], [-43.27495834, 37.9264539], [-48.63789174, 32.03631021],
                      [-30.77788556, 19.68154824], [-20.39962477, 24.76222363], [15.35970888, 25.54368615],
                      [22.28650099, 15.74832835], [17.20246417, 4.848844867]]
@@ -160,4 +157,4 @@ if __name__ == '__main__':
                      [-30.77788556, 19.68154824], [-20.39962477, 24.76222363], [15.35970888, 25.54368615],
                      [22.28650099, 15.74832835], [17.20246417, 4.848844867]]
     runner = GymRunner(drivers, map_obstacles)
-    runner.run()
+    runner.run(zoom)
