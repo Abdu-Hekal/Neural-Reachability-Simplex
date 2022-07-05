@@ -586,7 +586,7 @@ if __name__ == '__main__':
 
     # Load the configuration for the desired Racetrack
     work = {'mass': 3.463388126201571, 'lf': 0.15597534362552312, 'tlad': 0.82461887897713965, 'vgain': 0.80}
-    with open('config_Spielberg_map.yaml') as file:
+    with open('../map/config_Spielberg_map.yaml') as file:
         conf_dict = yaml.load(file, Loader=yaml.FullLoader)
     conf = Namespace(**conf_dict)
 
@@ -658,7 +658,7 @@ if __name__ == '__main__':
         # Update Asynchronous Counter for the MPC loop
         control_count += 1
     if conf_dict['logging'] == 'True':
-        pickle.dump(logging, open("Data_Visualization/datalogging_MPC.p", "wb"))
+        pickle.dump(logging, open("../Data_Visualization/datalogging_MPC.p", "wb"))
 
     # Print Statement that simulation is over
     print('Sim elapsed time:', laptime, 'Real elapsed time:', time.time() - start)

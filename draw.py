@@ -26,8 +26,8 @@ def un_convert(point):
 
 
 def add_obstacles(obstacles):
-    orig_map = "Spielberg_map.png"
-    new_map = "new_spielberg.png"
+    orig_map = "map/Spielberg_map.png"
+    new_map = "obstacle_map/new_spielberg.png"
 
     for obstacle in obstacles:
         obs = un_convert(obstacle)

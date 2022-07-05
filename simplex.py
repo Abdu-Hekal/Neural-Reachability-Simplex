@@ -9,7 +9,7 @@ from argparse import Namespace, ArgumentParser, ArgumentDefaultsHelpFormatter
 
 import draw
 import reach
-from MPC_Tracking import LatticePlanner, Controller, State
+from controllers.MPC_Tracking import LatticePlanner, Controller, State
 from drivers import GapFollower
 
 # choose your drivers here (1-4)
@@ -29,7 +29,7 @@ class GymRunner(object):
         self.map_obstacles = map_obstacles
 
     def setup_env(self):
-        with open('new_config_Spielberg_map.yaml') as file:
+        with open('obstacle_map/new_config_Spielberg_map.yaml') as file:
             conf_dict = yaml.load(file, Loader=yaml.FullLoader)
         self.conf = Namespace(**conf_dict)
 
