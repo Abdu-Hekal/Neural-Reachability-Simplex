@@ -7,10 +7,10 @@ import pyglet
 import yaml
 from argparse import Namespace, ArgumentParser, ArgumentDefaultsHelpFormatter
 
-import draw
-import reach
+from obstacle_map import draw
 from controllers.MPC_Tracking import LatticePlanner, Controller, State
-from drivers import GapFollower
+from controllers.drivers import GapFollower
+import reachability.f110_reach as reach
 
 # choose your drivers here (1-4)
 drivers = [GapFollower()]
@@ -27,6 +27,9 @@ class GymRunner(object):
         self.control_count = 10
         self.intersect = False
         self.map_obstacles = map_obstacles
+        self.ftg = False
+        self.actions = None
+        self.label = ""
 
     def setup_env(self):
         with open('obstacle_map/new_config_Spielberg_map.yaml') as file:
@@ -83,6 +86,42 @@ class GymRunner(object):
                 vertex_list.delete()
             self.vertices_list = None
 
+    def check_zoom(self, zoom):
+        if not zoom:
+            self.env.renderer.bottom = 7 * -460 + 1500
+            self.env.renderer.top = 7 * 460 + 1500
+            self.env.renderer.left = 7 * -560.0
+            self.env.renderer.right = 7 * 560.0
+
+    def select_control(self, ftg_laptime):
+        if self.control_count == 10:
+            self.rm_plotted_reach_sets()
+            self.actions = self.mpc()
+            self.control_count = 0
+            self.ftg = False
+            self.label = "MPC"
+
+        if self.intersect or self.ftg:
+            self.actions = self.follow_the_gap()
+            self.ftg = True
+            ftg_laptime += self.step_reward
+            self.label = "Follow the Gap"
+            # time.sleep(0.1)
+
+    def camera_follow(self, old_cam_point):
+        # camera to follow vehicle
+        camera_point = [self.obs['poses_x'][0] - old_cam_point[0], self.obs['poses_y'][0] - old_cam_point[1]]
+        self.env.renderer.bottom += (camera_point[1] * 50)
+        self.env.renderer.top += (camera_point[1] * 50)
+        self.env.renderer.left += (camera_point[0] * 50)
+        self.env.renderer.right += (camera_point[0] * 50)
+
+    def end_sim(self, ftg_laptime):
+        print("Lap completed!")
+        print("follow the gap control %: ", (ftg_laptime / self.laptime) * 100)
+        print("mpc control %: ", 100 - ((ftg_laptime / self.laptime) * 100))
+        print('Sim elapsed time:', self.laptime, 'Real elapsed time:', time.time() - start)
+
     def run(self, zoom):
         # load map
         self.env.renderer.set_fullscreen(True)
@@ -96,51 +135,23 @@ class GymRunner(object):
 
         while not self.done and self.env.renderer.alive:
 
-            if not zoom:
-                self.env.renderer.bottom = 7 * -460 +1500
-                self.env.renderer.top = 7 * 460 +1500
-                self.env.renderer.left = 7 * -560.0
-                self.env.renderer.right = 7 * 560.0
-
-            if self.control_count == 10:
-                self.rm_plotted_reach_sets()
-                actions = self.mpc()
-                self.control_count = 0
-                ftg = False
-                label = "MPC"
-
-            if self.intersect or ftg:
-                actions = self.follow_the_gap()
-                ftg = True
-                ftg_laptime += self.step_reward
-                label = "Follow the Gap"
-                # time.sleep(0.1)
+            self.check_zoom(zoom)
+            self.select_control(ftg_laptime)
 
             old_cam_point = [self.obs['poses_x'][0], self.obs['poses_y'][0]]
+            pyglet_label.text = self.label
+            self.obs, self.step_reward, self.done, self.info = self.env.step(self.actions)
 
-            pyglet_label.text = label
-            self.obs, self.step_reward, self.done, self.info = self.env.step(actions)
-
-            # camera to follow vehicle
-            camera_point = [self.obs['poses_x'][0] - old_cam_point[0], self.obs['poses_y'][0] - old_cam_point[1]]
-            self.env.renderer.bottom += (camera_point[1] * 50)
-            self.env.renderer.top += (camera_point[1] * 50)
-            self.env.renderer.left += (camera_point[0] * 50)
-            self.env.renderer.right += (camera_point[0] * 50)
-
+            self.camera_follow(old_cam_point)
             self.laptime += self.step_reward
-
             self.env.render(mode='human_fast')
 
             if self.env.lap_counts[0] == 1:
-                print("Lap completed!")
-                print("follow the gap control %: ", (ftg_laptime / self.laptime) * 100)
-                print("mpc control %: ", 100 - ((ftg_laptime / self.laptime) * 100))
                 break;
 
             self.control_count += 1
 
-        print('Sim elapsed time:', self.laptime, 'Real elapsed time:', time.time() - start)
+        self.end_sim(ftg_laptime, start)
 
 
 if __name__ == '__main__':

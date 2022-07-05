@@ -9,7 +9,7 @@ author: Abdelrahman Hekal
 import pyglet
 from pyglet.graphics import TextureGroup
 
-import reachability.main as reach
+import reachability.neural_reach as reach
 import reachset_transform.main as transform
 import Car_dimensions.main as car_reach
 

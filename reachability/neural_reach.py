@@ -5,12 +5,7 @@ Generating untransformed reachable sets from trained neural networks using contr
 author: Abdelrahman Hekal
 
 """
-import numpy
 import torch
-
-import reachset_transform.main as transform
-
-import matplotlib.pyplot as plt
 from pytope import Polytope
 
 # CUDA for PyTorch

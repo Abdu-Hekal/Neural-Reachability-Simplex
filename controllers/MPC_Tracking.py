@@ -1,5 +1,3 @@
-import random
-
 import cvxpy
 import time
 import yaml
@@ -10,15 +8,8 @@ import math
 from numba import njit
 import matplotlib.pyplot as plt
 import pickle
-import copy
-import cubic_spline_planner
 
-import pyglet
 from pyglet.gl import *
-from pyglet import shapes
-from shapely.geometry import Polygon as shapely_poly
-
-import reach
 
 # --------------------------- Controller Paramter ---------------------------
 # System config
