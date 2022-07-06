@@ -13,7 +13,7 @@ from controllers.drivers import GapFollower
 import reachability.f110_reach as reach
 
 # choose your drivers here (1-4)
-drivers = [GapFollower()]
+drivers = [GapFollower(), GapFollower()]
 
 
 class GymRunner(object):
@@ -36,7 +36,7 @@ class GymRunner(object):
             conf_dict = yaml.load(file, Loader=yaml.FullLoader)
         self.conf = Namespace(**conf_dict)
 
-        self.env = gym.make('f110_gym:f110-v0', map=self.conf.map_path, map_ext=self.conf.map_ext, num_agents=1)
+        self.env = gym.make('f110_gym:f110-v0', map=self.conf.map_path, map_ext=self.conf.map_ext, num_agents=2)
         self.obs, self.step_reward, self.done, self.info = self.env.reset(
             np.array([[self.conf.sx, self.conf.sy, self.conf.stheta]
                       ]))
