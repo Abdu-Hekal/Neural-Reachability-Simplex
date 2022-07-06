@@ -1,4 +1,6 @@
+import random
 import time
+
 import gym
 import numpy as np
 import concurrent.futures
@@ -7,58 +9,58 @@ import pyglet
 import yaml
 from argparse import Namespace, ArgumentParser, ArgumentDefaultsHelpFormatter
 
+from controllers.mpc import MPC
 from obstacle_map import draw
 from controllers.MPC_Tracking import LatticePlanner, Controller, State
 from controllers.drivers import GapFollower
 import reachability.f110_reach as reach
 
-# choose your drivers here (1-4)
-drivers = [GapFollower()]
-
 
 class GymRunner(object):
 
-    def __init__(self, drivers, map_obstacles):
-        self.vertices_list = None
-        self.drivers = drivers
-        self.setup_env()
-        self.setup_mpc()
-        self.laptime = 0.0
+    def __init__(self, mpcs, gap_followers, map_obstacles):
+        self.vertices_list = []
+        self.gap_followers = gap_followers
+        self.mpcs = mpcs
         self.control_count = 10
         self.intersect = False
         self.map_obstacles = map_obstacles
         self.ftg = False
         self.actions = None
         self.label = ""
+        self.setup_env()
+        self.setup_mpcs()
 
     def setup_env(self):
         with open('obstacle_map/new_config_Spielberg_map.yaml') as file:
             conf_dict = yaml.load(file, Loader=yaml.FullLoader)
         self.conf = Namespace(**conf_dict)
 
-        self.env = gym.make('f110_gym:f110-v0', map=self.conf.map_path, map_ext=self.conf.map_ext, num_agents=1)
+        self.env = gym.make('f110_gym:f110-v0', map=self.conf.map_path, map_ext=self.conf.map_ext, num_agents=2)
         self.obs, self.step_reward, self.done, self.info = self.env.reset(
-            np.array([[self.conf.sx, self.conf.sy, self.conf.stheta]
+            np.array([[self.conf.sx, self.conf.sy, self.conf.stheta], [self.conf.sx2, self.conf.sy2, self.conf.stheta2]
                       ]))
         self.env.render()
 
-    def setup_mpc(self):
-        self.planner = LatticePlanner(self.conf, self.env)
-        self.controller = Controller(self.conf)
-        # Load global raceline to create a path variable that includes all reference path information
-        self.path = self.planner.plan()
+    def setup_mpcs(self):
+        for i, mpc in enumerate(self.mpcs):
+            mpc.setup(self.conf, self.env, i)
 
     def mpc(self):
-        state = State(x=self.obs['poses_x'][0], y=self.obs['poses_y'][0], yaw=self.obs['poses_theta'][0],
-                      v=self.obs['linear_vels_x'][0])
-        speed, steer = self.planner.control(self.obs['poses_x'][0], self.obs['poses_y'][0], self.obs['poses_theta'][0],
-                                            self.obs['linear_vels_x'][0], self.path, self.controller)
-
-        # run reachability and plot
-        self.vertices_list, self.intersect = reach.reachability(self.controller.oa, self.controller.odelta, state,
-                                                                self.env.renderer.batch, self.map_obstacles)
-
-        actions = np.array([[steer, speed]])
+        actions = []
+        futures = []
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            for mpc in self.mpcs:
+                futures.append(executor.submit(mpc.step, self.obs))
+        for future, mpc in zip(futures, self.mpcs):
+            speed, steer, state = future.result()
+            # run reachability and plot
+            print(mpc.num, state.x)
+            vertices_list, self.intersect = reach.reachability(mpc.controller.oa, mpc.controller.odelta, state,
+                                                                    self.env.renderer.batch, self.map_obstacles, mpc.color)
+            self.vertices_list += vertices_list
+            actions.append([steer, speed])
+        actions = np.array(actions)
 
         return actions
 
@@ -68,7 +70,7 @@ class GymRunner(object):
         actions = []
         futures = []
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            for i, driver in enumerate(drivers):
+            for i, driver in enumerate(self.gap_followers):
                 futures.append(executor.submit(driver.process_lidar, self.obs['scans'][i]))
         for future in futures:
             speed, steer = future.result()
@@ -84,7 +86,7 @@ class GymRunner(object):
         if self.vertices_list:
             for vertex_list in self.vertices_list:
                 vertex_list.delete()
-            self.vertices_list = None
+            self.vertices_list = []
 
     def check_zoom(self, zoom):
         if not zoom:
@@ -116,17 +118,18 @@ class GymRunner(object):
         self.env.renderer.left += (camera_point[0] * 50)
         self.env.renderer.right += (camera_point[0] * 50)
 
-    def end_sim(self, ftg_laptime, start):
+    def end_sim(self, laptime, ftg_laptime, start):
         print("Lap completed!")
-        print("follow the gap control %: ", (ftg_laptime / self.laptime) * 100)
-        print("mpc control %: ", 100 - ((ftg_laptime / self.laptime) * 100))
-        print('Sim elapsed time:', self.laptime, 'Real elapsed time:', time.time() - start)
+        print("follow the gap control %: ", (ftg_laptime / laptime) * 100)
+        print("mpc control %: ", 100 - ((ftg_laptime / laptime) * 100))
+        print('Sim elapsed time:', laptime, 'Real elapsed time:', time.time() - start)
 
     def run(self, zoom):
         # load map
         self.env.renderer.set_fullscreen(True)
         self.env.renderer.set_mouse_visible(False)
         start = time.time()
+        laptime = 0
         ftg_laptime = 0
 
         pyglet_label = pyglet.text.Label('{label}'.format(
@@ -143,7 +146,7 @@ class GymRunner(object):
             self.obs, self.step_reward, self.done, self.info = self.env.step(self.actions)
 
             self.camera_follow(old_cam_point)
-            self.laptime += self.step_reward
+            laptime += self.step_reward
             self.env.render(mode='human_fast')
 
             if self.env.lap_counts[0] == 1:
@@ -151,7 +154,7 @@ class GymRunner(object):
 
             self.control_count += 1
 
-        self.end_sim(ftg_laptime, start)
+        self.end_sim(laptime, ftg_laptime, start)
 
 
 if __name__ == '__main__':
@@ -167,5 +170,7 @@ if __name__ == '__main__':
     map_obstacles = [[-58.51379908, 31.52080008], [-43.27495834, 37.9264539], [-48.63789174, 32.03631021],
                      [-30.77788556, 19.68154824], [-20.39962477, 24.76222363], [15.35970888, 25.54368615],
                      [22.28650099, 15.74832835], [17.20246417, 4.848844867]]
-    runner = GymRunner(drivers, map_obstacles)
+    gap_followers = [GapFollower(), GapFollower()]
+    mpcs = [MPC(), MPC()]
+    runner = GymRunner(mpcs, gap_followers, map_obstacles)
     runner.run(zoom)
