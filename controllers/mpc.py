@@ -7,7 +7,6 @@ class MPC:
         self.path = None
         self.controller = None
         self.planner = None
-        self.color = (random.randint(0,255), random.randint(0,255), random.randint(0,255), 10)
 
     def setup(self, conf, env, num):
         self.planner = LatticePlanner(conf, env)

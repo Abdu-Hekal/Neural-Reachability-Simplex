@@ -1,5 +1,6 @@
 import random
 import time
+import itertools
 
 import gym
 import numpy as np
@@ -10,6 +11,7 @@ import yaml
 from argparse import Namespace, ArgumentParser, ArgumentDefaultsHelpFormatter
 
 from controllers.mpc import MPC
+from map.start_point import get_rand_start_point
 from obstacle_map import draw
 from controllers.MPC_Tracking import LatticePlanner, Controller, State
 from controllers.drivers import GapFollower
@@ -18,7 +20,7 @@ import reachability.f110_reach as reach
 
 class GymRunner(object):
 
-    def __init__(self, mpcs, gap_followers, map_obstacles):
+    def __init__(self, mpcs, gap_followers, map_obstacles, num):
         self.vertices_list = []
         self.gap_followers = gap_followers
         self.mpcs = mpcs
@@ -28,23 +30,33 @@ class GymRunner(object):
         self.ftg = False
         self.actions = None
         self.label = ""
+        self.num_vehicles = num
         self.setup_env()
         self.setup_mpcs()
+        self.setup_colors()
 
     def setup_env(self):
         with open('obstacle_map/new_config_Spielberg_map.yaml') as file:
             conf_dict = yaml.load(file, Loader=yaml.FullLoader)
         self.conf = Namespace(**conf_dict)
-
-        self.env = gym.make('f110_gym:f110-v0', map=self.conf.map_path, map_ext=self.conf.map_ext, num_agents=2)
-        self.obs, self.step_reward, self.done, self.info = self.env.reset(
-            np.array([[self.conf.sx, self.conf.sy, self.conf.stheta], [self.conf.sx2, self.conf.sy2, self.conf.stheta2]
-                      ]))
+        self.env = gym.make('f110_gym:f110-v0', map=self.conf.map_path, map_ext=self.conf.map_ext, num_agents=self.num_vehicles)
+        start_points = get_rand_start_point('map/Spielberg_raceline.csv', self.num_vehicles)
+        env_array = []
+        for start_point in start_points:
+            point_array = start_point.split(";")
+            env_array.append([float(point_array[1]), float(point_array[2]), float(point_array[3])])
+        self.obs, self.step_reward, self.done, self.info = self.env.reset(np.array(env_array))
         self.env.render()
 
     def setup_mpcs(self):
         for i, mpc in enumerate(self.mpcs):
             mpc.setup(self.conf, self.env, i)
+
+    def setup_colors(self):
+        self.colors = []
+        for i in range(self.num_vehicles):
+            self.colors.append((random.randint(0,250), random.randint(0,250), random.randint(0,250), 10))
+
 
     def mpc(self):
         actions = []
@@ -52,12 +64,13 @@ class GymRunner(object):
         with concurrent.futures.ThreadPoolExecutor() as executor:
             for mpc in self.mpcs:
                 futures.append(executor.submit(mpc.step, self.obs))
-        for future, mpc in zip(futures, self.mpcs):
+
+
+        for future, mpc, reach_color in itertools.zip_longest(futures, self.mpcs, self.colors):
             speed, steer, state = future.result()
             # run reachability and plot
-            print(mpc.num, state.x)
-            vertices_list, self.intersect = reach.reachability(mpc.controller.oa, mpc.controller.odelta, state,
-                                                                    self.env.renderer.batch, self.map_obstacles, mpc.color)
+            vertices_list, self.intersect = reach.reachability(mpc.controller.oa, mpc.controller.odelta, mpc.num, state,
+                                                                    self.env.renderer.batch, self.map_obstacles, reach_color)
             self.vertices_list += vertices_list
             actions.append([steer, speed])
         actions = np.array(actions)
@@ -161,8 +174,10 @@ if __name__ == '__main__':
     parser = ArgumentParser(description="Settings",
                             formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument("-z", "--zoom", action="store_true", help="Zoom in camera")
+    parser.add_argument("-n", "--number", type=int, default=1, help='number of vehicles')
     args = vars(parser.parse_args())
     zoom = args['zoom']
+    num = args['number']
     map_obstacles = [[-58.51379908, 31.52080008], [-43.27495834, 37.9264539], [-48.63789174, 32.03631021],
                      [-30.77788556, 19.68154824], [-20.39962477, 24.76222363], [15.35970888, 25.54368615],
                      [22.28650099, 15.74832835], [17.20246417, 4.848844867]]
@@ -170,7 +185,10 @@ if __name__ == '__main__':
     map_obstacles = [[-58.51379908, 31.52080008], [-43.27495834, 37.9264539], [-48.63789174, 32.03631021],
                      [-30.77788556, 19.68154824], [-20.39962477, 24.76222363], [15.35970888, 25.54368615],
                      [22.28650099, 15.74832835], [17.20246417, 4.848844867]]
-    gap_followers = [GapFollower(), GapFollower()]
-    mpcs = [MPC(), MPC()]
-    runner = GymRunner(mpcs, gap_followers, map_obstacles)
+    gap_followers = []
+    mpcs = []
+    for i in range(num):
+        gap_followers.append(GapFollower())
+        mpcs.append(MPC())
+    runner = GymRunner(mpcs, gap_followers, map_obstacles, num)
     runner.run(zoom)

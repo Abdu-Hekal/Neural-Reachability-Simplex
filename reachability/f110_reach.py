@@ -21,7 +21,7 @@ theta_min_model = reach.get_theta_min_model()
 theta_max_model = reach.get_theta_max_model()
 
 
-def reachability(oa, odelta, state, batch, map_obstacles, color):
+def reachability(oa, odelta, car_num, state, batch, map_obstacles, color):
     """
     Generate reachable sets and check for intersection with obstacle
 
@@ -34,7 +34,7 @@ def reachability(oa, odelta, state, batch, map_obstacles, color):
     for reach_iter in range(60):  # range(99, -1, -1)
         final_reach_poly = transform_reachsets(reach_iter, sf_list, theta_min_list, theta_max_list, state)
         intersect = check_intersection(reach_iter, final_reach_poly, map_obstacles, intersect)
-        plot_reachset(final_reach_poly, batch, vertices_list, color)
+        plot_reachset(car_num, final_reach_poly, batch, vertices_list, color)
 
     return vertices_list, intersect
 
@@ -83,14 +83,15 @@ def check_intersection(reach_iter, final_reach_poly, map_obstacles, intersect):
     return intersect
 
 
-def plot_reachset(final_reach_poly, batch, vertices_list, color):
+def plot_reachset(car_num, final_reach_poly, batch, vertices_list, color):
     vertices = []
     for vertex in final_reach_poly.V:
         for val in vertex:
             vertices.append(50 * val)
-    background = pyglet.graphics.OrderedGroup(-1)
+    background = pyglet.graphics.OrderedGroup(-(car_num+1))
     howmany = int(len(vertices) / 2)
     colors = color * howmany
+
     vertex_list = batch.add(len(final_reach_poly.V), pyglet.gl.GL_POLYGON, background, ('v2f', vertices),
-                            ('c4B', colors))
+                        ('c4B', colors))
     vertices_list.append(vertex_list)
