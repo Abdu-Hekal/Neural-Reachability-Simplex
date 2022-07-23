@@ -13,7 +13,6 @@ from argparse import Namespace, ArgumentParser, ArgumentDefaultsHelpFormatter
 from controllers.mpc import MPC
 from map.start_point import get_rand_start_point
 from obstacle_map import draw
-from controllers.MPC_Tracking import LatticePlanner, Controller, State
 from controllers.drivers import GapFollower
 import reachability.f110_reach as reach
 
@@ -39,7 +38,8 @@ class GymRunner(object):
         with open('obstacle_map/new_config_Spielberg_map.yaml') as file:
             conf_dict = yaml.load(file, Loader=yaml.FullLoader)
         self.conf = Namespace(**conf_dict)
-        self.env = gym.make('f110_gym:f110-v0', map=self.conf.map_path, map_ext=self.conf.map_ext, num_agents=self.num_vehicles)
+        self.env = gym.make('f110_gym:f110-v0', map=self.conf.map_path, map_ext=self.conf.map_ext,
+                            num_agents=self.num_vehicles)
         start_points = get_rand_start_point('map/Spielberg_raceline.csv', self.num_vehicles)
         env_array = []
         for start_point in start_points:
@@ -55,8 +55,7 @@ class GymRunner(object):
     def setup_colors(self):
         self.colors = []
         for i in range(self.num_vehicles):
-            self.colors.append((random.randint(0,250), random.randint(0,250), random.randint(0,250), 10))
-
+            self.colors.append((random.randint(0, 250), random.randint(0, 250), random.randint(0, 250), 10))
 
     def mpc(self):
         actions = []
@@ -65,12 +64,11 @@ class GymRunner(object):
             for mpc in self.mpcs:
                 futures.append(executor.submit(mpc.step, self.obs))
 
-
         for future, mpc, reach_color in itertools.zip_longest(futures, self.mpcs, self.colors):
             speed, steer, state = future.result()
             # run reachability and plot
             vertices_list, self.intersect = reach.reachability(mpc.controller.oa, mpc.controller.odelta, mpc.num, state,
-                                                                    self.env.renderer.batch, self.map_obstacles, reach_color)
+                                                               self.env.renderer.batch, self.map_obstacles, reach_color)
             self.vertices_list += vertices_list
             actions.append([steer, speed])
         actions = np.array(actions)
