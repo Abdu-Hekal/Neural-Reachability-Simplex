@@ -48,6 +48,7 @@ class GymRunner(object):
         for start_point in start_points:
             point_array = start_point.split(";")
             env_array.append([float(point_array[1]), float(point_array[2]), float(point_array[3])])
+            #env_array.append([-0.0440806, -0.8491629, 3.4034118])
         self.obs, self.step_reward, self.done, self.info = self.env.reset(np.array(env_array))
         self.env.render()
 
@@ -83,7 +84,7 @@ class GymRunner(object):
         return actions
 
     def follow_the_gap(self):
-        MAX_STEER = np.deg2rad(45.0)  # maximum steering angle [rad]
+        MAX_STEER = 0.4189 # maximum steering angle [rad]
         MAX_SPEED = 5  # maximum speed [m/s]
         actions = []
         futures = []
@@ -96,6 +97,7 @@ class GymRunner(object):
             steer = min(steer, MAX_STEER)
             actions.append([steer, speed])
         actions = np.array(actions)
+        print(actions)
 
         return actions
 

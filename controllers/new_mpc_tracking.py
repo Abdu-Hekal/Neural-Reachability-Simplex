@@ -27,7 +27,7 @@ MAX_ITER = 1  # Max iteration
 DU_TH = 0.01  # Threshold for stopping iteration
 N_IND_SEARCH = 5  # Search index number
 DT = 0.10  # time step [s]
-dl = 0.30  # dist step [m]
+dl = 0.20  # dist step [m]
 
 # Vehicle parameters
 LENGTH = 0.58  # Length of the vehicle [m]
@@ -35,7 +35,7 @@ WIDTH = 0.31  # Width of the vehicle [m]
 WB = 0.33  # Wheelbase [m]
 MAX_STEER = 0.4189  # maximum steering angle [rad] from f1tenth gym library
 MAX_DSTEER = 3.2  # maximum steering speed [rad/s] from f1tenth gym library
-MAX_SPEED = 10 # maximum speed [m/s] from training data on flowstar
+MAX_SPEED = 5 # maximum speed [m/s] from training data on flowstar
 MIN_SPEED = 0  # minimum backward speed [m/s]
 MAX_ACCEL = 9.51  # maximum acceleration [m/ss] from f1tenth gym library
 
@@ -495,11 +495,7 @@ class Controller:
         # speed_output=ref_path[2][1]*0.50
         speed_output = vehicle_state.v + self.oa[0] * DT
 
-        # print ("Current Speed:", vehicle_state.v, "Control Speed:", speed,"MPC Speed:",ov)
-        # print("Vehicle Heading: ", vehicle_state.yaw, "MPC Heading:",oyaw[0], "RefPath Heading:",ref_path[3], "Racline Heading:",cyaw[self.target_ind])
-        # print ("Vehicle X:", vehicle_state.x, "Target X:",cx[self.target_ind],"----- Vehicle Y:", vehicle_state.y, " Target Y:",cy[self.target_ind])
 
-        print(self.oa)
         return speed_output, steer_output
 
 
@@ -551,4 +547,70 @@ class LatticePlanner:
 
         return speed, steering_angle
 
+# -------------------------- MAIN SIMULATION  ----------------------------------------
 
+if __name__ == '__main__':
+    # Check CVXP Installations
+    #print(cvxpy.installed_solvers())
+
+    # Load the configuration for the desired Racetrack
+    work = {'mass': 3.463388126201571, 'lf': 0.15597534362552312, 'tlad': 0.82461887897713965, 'vgain': 0.80}
+    with open('map/config_Spielberg_map.yaml') as file:
+        conf_dict = yaml.load(file, Loader=yaml.FullLoader)
+    conf = Namespace(**conf_dict)
+
+    # Create the simulation environment and inititalize it
+    env = gym.make('f110_gym:f110-v0', map=conf.map_path, map_ext=conf.map_ext, num_agents=1)
+    obs, step_reward, done, info = env.reset(np.array([[conf.sx, conf.sy, conf.stheta]]))
+    env.render()
+
+    # Creating the Motion planner and Controller object that is used in Gym
+    planner = LatticePlanner(conf, env)
+    controller = Controller(conf)
+
+    # Creating a Datalogger object that saves all necessary vehicle data
+    logging = Datalogger(conf)
+
+    # Initialize Simulation
+    laptime = 0.0
+    control_count = 10
+    start = time.time()
+
+    # Load global raceline to create a path variable that includes all reference path information
+    path = planner.plan()
+
+    # -------------------------- SIMULATION LOOP  ----------------------------------------
+    while not done:
+        # Call the function for planning a path, only every 15th timestep
+        if control_count == 10:
+
+            # Call the function for tracking speed and steering
+            # MPC specific: We solve the MPC problem only every 6th timestep of the simultation to decrease the sim time
+            speed, steer = planner.control(obs['poses_x'][0], obs['poses_y'][0], obs['poses_theta'][0],obs['linear_vels_x'][0], path, controller)
+            control_count = 0
+
+        # Update the simulation environment
+
+        obs, step_reward, done, info = env.step(np.array([[steer, speed]]))
+        laptime += step_reward
+
+        env.render(mode='human_fast')
+
+        # Apply Looging to log information from the waypoints
+
+        if conf_dict['logging'] == 'True':
+            logging.logging(obs['poses_x'][0], obs['poses_y'][0], obs['poses_theta'][0], obs['linear_vels_x'][0],
+                            obs['linear_vels_y'][0], obs['lap_counts'], speed, steer)
+
+            wpts = np.vstack((planner.waypoints[:, conf.wpt_xind], planner.waypoints[:, conf.wpt_yind])).T
+            vehicle_state = np.array([obs['poses_x'][0], obs['poses_y'][0]])
+            nearest_point, nearest_dist, t, i = nearest_point_on_trajectory(vehicle_state, wpts)
+            logging.logging2(nearest_point[0], nearest_point[1], path[2][i])
+
+        # Update Asynchronous Counter for the MPC loop
+        control_count = control_count + 1
+    if conf_dict['logging'] == 'True':
+        pickle.dump(logging, open("../Data_Visualization/datalogging_MPC.p", "wb"))
+
+    # Print Statement that simulation is over
+    print('Sim elapsed time:', laptime, 'Real elapsed time:', time.time() - start)
