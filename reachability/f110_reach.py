@@ -21,22 +21,23 @@ theta_min_model = reach.get_theta_min_model()
 theta_max_model = reach.get_theta_max_model()
 
 
-def reachability(oa, odelta, car_num, state, batch, map_obstacles, color):
+def reachability(oa, odelta, car_num, state, batch, color):
     """
-    Generate reachable sets and check for intersection with obstacle
+    Generate reachable sets
 
    """
 
     sf_list, theta_min_list, theta_max_list = compute_reachsets(oa, odelta, state)
 
     vertices_list = []
-    intersect = False
+    polys = []
     for reach_iter in range(60):  # range(99, -1, -1)
-        final_reach_poly = transform_reachsets(reach_iter, sf_list, theta_min_list, theta_max_list, state)
-        intersect = check_intersection(reach_iter, final_reach_poly, map_obstacles, intersect)
-        plot_reachset(car_num, final_reach_poly, batch, vertices_list, color)
+        final_reach_poly = transform_reachsets(reach_iter, sf_list, theta_min_list[0][reach_iter][0],  theta_max_list[0][reach_iter][0], state)
+        if final_reach_poly:
+            plot_reachset(car_num, final_reach_poly, batch, vertices_list, color)
+            polys.append(final_reach_poly)
 
-    return vertices_list, intersect
+    return vertices_list, polys
 
 
 def compute_reachsets(oa, odelta, state):
@@ -56,31 +57,19 @@ def compute_reachsets(oa, odelta, state):
     return sf_list, theta_min_list, theta_max_list
 
 
-def transform_reachsets(reach_iter, sf_list, theta_min_list, theta_max_list, state):
+def transform_reachsets(reach_iter, sf_list, theta_min, theta_max, state):
     new_sf_list = []
     for dirs in range(len(sf_list)):
         new_sf_list.append(sf_list[dirs][0][reach_iter][0])
     poly_reach = reach.sf_to_poly(new_sf_list)
 
-    full_reach_poly = car_reach.add_car_to_reachset(poly_reach, theta_min_list[0][reach_iter][0],
-                                                    theta_max_list[0][reach_iter][0])
-
-    final_reach_poly = transform.transform_poly(full_reach_poly, state.yaw, state.x, state.y)
+    if poly_reach.V.size != 0:
+        full_reach_poly = car_reach.add_car_to_reachset(poly_reach, theta_min, theta_max)
+        final_reach_poly = transform.transform_poly(full_reach_poly, state.yaw, state.x, state.y)
+    else:
+        final_reach_poly = None
 
     return final_reach_poly
-
-
-def check_intersection(reach_iter, final_reach_poly, map_obstacles, intersect):
-    # checks intersection with reachset and obstacle
-    if reach_iter < 30:
-        reachpoly = shapely_poly(final_reach_poly.V)
-        for map_obstacle in map_obstacles:
-            p = Point(map_obstacle)
-            c = p.buffer(0.75).boundary
-            if c.intersects(reachpoly):
-                intersect = True
-
-    return intersect
 
 
 def plot_reachset(car_num, final_reach_poly, batch, vertices_list, color):

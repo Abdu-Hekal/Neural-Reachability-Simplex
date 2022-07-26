@@ -21,24 +21,23 @@ Rd = np.diag([0.01, 100.0])  # input difference cost matrix, penalty for change 
 Q = np.diag([13.5, 13.5, 5.5, 13.0])  # state cost matrix, for the the next (T) prediction time steps [x, y, v, yaw]
 Qf = np.diag([13.5, 13.5, 5.5, 13.0])  # state final matrix, penalty  for the final state constraints: [x, y, v, yaw]
 
+
 # Iterative paramter
 MAX_ITER = 1  # Max iteration
 DU_TH = 0.01  # Threshold for stopping iteration
 N_IND_SEARCH = 5  # Search index number
 DT = 0.10  # time step [s]
-dl = 0.20  # dist step [m]
+dl = 0.30  # dist step [m]
 
 # Vehicle parameters
 LENGTH = 0.58  # Length of the vehicle [m]
 WIDTH = 0.31  # Width of the vehicle [m]
 WB = 0.33  # Wheelbase [m]
-MAX_STEER = np.deg2rad(24.0)  # maximum steering angle [rad]
-# MAX_STEER = np.deg2rad(24.0)        # maximum steering angle [rad]         #REAL PARAMETER
-MAX_DSTEER = np.deg2rad(180.0)  # maximum steering speed [rad/s]
-# MAX_DSTEER = np.deg2rad(180.0)       # maximum steering speed [rad/s]      #REAL PARAMETER
-MAX_SPEED = 6.5  # maximum speed [m/s]
+MAX_STEER = 0.4189  # maximum steering angle [rad] from f1tenth gym library
+MAX_DSTEER = 3.2  # maximum steering speed [rad/s] from f1tenth gym library
+MAX_SPEED = 10 # maximum speed [m/s] from training data on flowstar
 MIN_SPEED = 0  # minimum backward speed [m/s]
-MAX_ACCEL = 11.5  # maximum acceleration [m/ss]
+MAX_ACCEL = 9.51  # maximum acceleration [m/ss] from f1tenth gym library
 
 """ 
 Planner Helpers

@@ -15,6 +15,7 @@ from map.start_point import get_rand_start_point
 from obstacle_map import draw
 from controllers.drivers import GapFollower
 import reachability.f110_reach as reach
+from shapely.geometry import Point
 
 
 class GymRunner(object):
@@ -64,14 +65,18 @@ class GymRunner(object):
             for mpc in self.mpcs:
                 futures.append(executor.submit(mpc.step, self.obs))
 
+        all_car_polys = []
         for future, mpc, reach_color in itertools.zip_longest(futures, self.mpcs, self.colors):
             speed, steer, state = future.result()
             # run reachability and plot
-            vertices_list, self.intersect = reach.reachability(mpc.controller.oa, mpc.controller.odelta, mpc.num, state,
-                                                               self.env.renderer.batch, self.map_obstacles, reach_color)
+            vertices_list, polys = reach.reachability(mpc.controller.oa, mpc.controller.odelta, mpc.num, state,
+                                                               self.env.renderer.batch, reach_color)
+            all_car_polys.append(polys)
             self.vertices_list += vertices_list
             actions.append([steer, speed])
         actions = np.array(actions)
+
+        self.check_intersection(all_car_polys)
 
         return actions
 
@@ -121,6 +126,15 @@ class GymRunner(object):
             self.label = "Follow the Gap"
             # time.sleep(0.1)
 
+    def check_intersection(self, all_car_polys):
+        for i, polys in enumerate(all_car_polys):
+            for reachpoly in polys:
+                for map_obstacle in map_obstacles:
+                    p = Point(map_obstacle)
+                    c = p.buffer(0.75).boundary
+                    if c.intersects(reachpoly):
+                        self.intersect = True
+
     def camera_follow(self, old_cam_point):
         # camera to follow vehicle
         camera_point = [self.obs['poses_x'][0] - old_cam_point[0], self.obs['poses_y'][0] - old_cam_point[1]]
@@ -148,6 +162,7 @@ class GymRunner(object):
             color=(255, 255, 255, 255), batch=self.env.renderer.batch)
 
         while not self.done and self.env.renderer.alive:
+            self.intersect = False
 
             self.check_zoom(zoom)
             self.select_control(ftg_laptime)
