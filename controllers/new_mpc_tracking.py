@@ -144,8 +144,7 @@ class State:
 
 class Controller:
 
-    def __init__(self, conf, wb):
-        self.wheelbase = wb
+    def __init__(self, conf):
         self.conf = conf
         self.load_waypoints(conf)
         self.mpc_initialize = 0
@@ -506,7 +505,7 @@ class Controller:
 
 class LatticePlanner:
 
-    def __init__(self, conf, env, wb):
+    def __init__(self, conf, env):
         self.conf = conf  # Current configuration for the gym based on the maps
         self.env = env  # Current environment parameter
         self.load_waypoints(conf)  # Waypoints of the raceline
@@ -535,7 +534,7 @@ class LatticePlanner:
 
         return global_raceline
 
-    def control(self, pose_x, pose_y, pose_theta, velocity, path):
+    def control(self, pose_x, pose_y, pose_theta, velocity, path, controller):
         """
         Control loop for calling the controller
         """
@@ -553,71 +552,3 @@ class LatticePlanner:
         return speed, steering_angle
 
 
-# -------------------------- MAIN SIMULATION  ----------------------------------------
-
-if __name__ == '__main__':
-    # Check CVXP Installations
-    # print(cvxpy.installed_solvers())
-
-    # Load the configuration for the desired Racetrack
-    work = {'mass': 3.463388126201571, 'lf': 0.15597534362552312, 'tlad': 0.82461887897713965, 'vgain': 0.80}
-    with open('map/config_Spielberg_map.yaml') as file:
-        conf_dict = yaml.load(file, Loader=yaml.FullLoader)
-    conf = Namespace(**conf_dict)
-
-    # Create the simulation environment and inititalize it
-    env = gym.make('f110_gym:f110-v0', map=conf.map_path, map_ext=conf.map_ext, num_agents=1)
-    obs, step_reward, done, info = env.reset(np.array([[conf.sx, conf.sy, conf.stheta]]))
-    env.render()
-    env.renderer.set_fullscreen(True)
-
-    # Creating the Motion planner and Controller object that is used in Gym
-    planner = LatticePlanner(conf, env, 0.17145 + 0.15875)
-    controller = Controller(conf, 0.17145 + 0.15875)
-
-    # Creating a Datalogger object that saves all necessary vehicle data
-    logging = Datalogger(conf)
-
-    # Initialize Simulation
-    laptime = 0.0
-    control_count = 10
-    start = time.time()
-
-    # Load global raceline to create a path variable that includes all reference path information
-    path = planner.plan()
-
-    # -------------------------- SIMULATION LOOP  ----------------------------------------
-    while not done and env.renderer.alive:
-        # Call the function for planning a path, only every 15th timestep
-        if control_count == 10:
-            # Call the function for tracking speed and steering
-            # MPC specific: We solve the MPC problem only every 6th timestep of the simultation to decrease the sim time
-            speed, steer = planner.control(obs['poses_x'][0], obs['poses_y'][0], obs['poses_theta'][0],
-                                           obs['linear_vels_x'][0], path)
-            control_count = 0
-
-        # Update the simulation environment
-
-        obs, step_reward, done, info = env.step(np.array([[steer, speed]]))
-        laptime += step_reward
-
-        env.render(mode='human_fast')
-
-        # Apply Looging to log information from the waypoints
-
-        if conf_dict['logging'] == 'True':
-            logging.logging(obs['poses_x'][0], obs['poses_y'][0], obs['poses_theta'][0], obs['linear_vels_x'][0],
-                            obs['linear_vels_y'][0], obs['lap_counts'], speed, steer)
-
-            wpts = np.vstack((planner.waypoints[:, conf.wpt_xind], planner.waypoints[:, conf.wpt_yind])).T
-            vehicle_state = np.array([obs['poses_x'][0], obs['poses_y'][0]])
-            nearest_point, nearest_dist, t, i = nearest_point_on_trajectory(vehicle_state, wpts)
-            logging.logging2(nearest_point[0], nearest_point[1], path[2][i])
-
-        # Update Asynchronous Counter for the MPC loop
-        control_count = control_count + 1
-    if conf_dict['logging'] == 'True':
-        pickle.dump(logging, open("Data_Visualization/datalogging_MPC.p", "wb"))
-
-    # Print Statement that simulation is over
-    print('Sim elapsed time:', laptime, 'Real elapsed time:', time.time() - start)

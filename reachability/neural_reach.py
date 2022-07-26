@@ -37,7 +37,7 @@ def get_models():
    """
     models = []
     for i in range(8):
-        file = 'reachability/bicyclemodels/new_bicycle_dir' + str(i + 1) + '_100kSamples_100kEpochs.pth'
+        file = 'reachability/bicyclemodels/0.5s_mpc/0.5s_mpc_dir' + str(i + 1) + '_model.pth'
         nn = load_checkpoint(file)
         models.append(nn)
     return models
@@ -117,12 +117,12 @@ def get_theta_max_list(inputs_list, model_optim):
 
 
 def get_theta_min_model():
-    file = 'reachability/bicyclemodels/new_bicycle_thetaMin_100kSamples_100kEpochs.pth'
+    file = 'reachability/bicyclemodels/0.5s_mpc/0.5s_mpc_theta_min_model.pth'
     model_optim = load_checkpoint(file)
     return model_optim
 
 
 def get_theta_max_model():
-    file = 'reachability/bicyclemodels/new_bicycle_thetaMax_100kSamples_100kEpochs.pth'
+    file = 'reachability/bicyclemodels/0.5s_mpc/0.5s_mpc_theta_max_model.pth'
     model_optim = load_checkpoint(file)
     return model_optim

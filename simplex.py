@@ -16,6 +16,8 @@ from obstacle_map import draw
 from controllers.drivers import GapFollower
 import reachability.f110_reach as reach
 from shapely.geometry import Point
+from shapely.geometry import Polygon as shapely_poly
+
 
 
 class GymRunner(object):
@@ -128,12 +130,21 @@ class GymRunner(object):
 
     def check_intersection(self, all_car_polys):
         for i, polys in enumerate(all_car_polys):
-            for reachpoly in polys:
+            for final_reach_poly in polys:
+                reachpoly = shapely_poly(final_reach_poly.V)
+                #check intersection with obstacles
                 for map_obstacle in map_obstacles:
                     p = Point(map_obstacle)
                     c = p.buffer(0.75).boundary
                     if c.intersects(reachpoly):
                         self.intersect = True
+                # check intersection of vehicles with one another
+                for x in range(len(all_car_polys)-1-i):
+                    for other_reachpoly in all_car_polys[-(x+1)]:
+                        other_reachpoly = shapely_poly(other_reachpoly.V)
+                        if other_reachpoly.intersects(reachpoly):
+                            self.intersect = True
+
 
     def camera_follow(self, old_cam_point):
         # camera to follow vehicle
