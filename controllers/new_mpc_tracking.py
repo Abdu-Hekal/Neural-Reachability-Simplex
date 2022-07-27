@@ -580,7 +580,7 @@ if __name__ == '__main__':
     path = planner.plan()
 
     # -------------------------- SIMULATION LOOP  ----------------------------------------
-    while not done:
+    while not done and env.renderer.alive:
         # Call the function for planning a path, only every 15th timestep
         if control_count == 10:
 
