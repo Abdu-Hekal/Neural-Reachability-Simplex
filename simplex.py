@@ -116,7 +116,7 @@ class GymRunner(object):
         self.env.renderer.left += (camera_point[0] * 50)
         self.env.renderer.right += (camera_point[0] * 50)
 
-    def end_sim(self, ftg_laptime):
+    def end_sim(self, ftg_laptime, start):
         print("Lap completed!")
         print("follow the gap control %: ", (ftg_laptime / self.laptime) * 100)
         print("mpc control %: ", 100 - ((ftg_laptime / self.laptime) * 100))
