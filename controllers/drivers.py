@@ -98,7 +98,7 @@ class GapFollower:
         speed = min(speed, MAX_SPEED)
         steering_angle = min(steering_angle, MAX_STEER)
 
-        return speed, steering_angle
+        return speed, steering_angle, None
 
 
 # drives straight ahead at a speed of 5

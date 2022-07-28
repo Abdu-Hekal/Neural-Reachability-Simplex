@@ -23,18 +23,13 @@ class Car:
         self.control_count = 10
         self.mpc_controller = mpc_controller
         self.ftg_controller = ftg_controller
+        self.action = None
+        self.future = None
         self.intersect = False
         self.ftg = False
-        self.reachset = None
+        self.reachset = []
         self.ftg_laptime = 0
         self.vertices_list = []
-
-    def select_control(self):
-        if self.control_count == 10:
-            self.ftg = False
-
-        if self.intersect or self.ftg:
-            self.ftg = True
 
     def rm_plotted_reach_sets(self):
         # AH: removes added vertex
@@ -54,6 +49,7 @@ class GymRunner(object):
         self.setup_env()
         self.setup_mpcs()
         self.setup_colors()
+        self.actions = None
 
     def setup_env(self):
         with open('obstacle_map/new_config_Spielberg_map.yaml') as file:
@@ -81,42 +77,43 @@ class GymRunner(object):
 
     def select_control(self, ftg_laptime):
         actions = []
-        futures = []
         self.label = ""
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            for i, car in enumerate(self.cars):
-                car.select_control()
-                if car.ftg:
-                    self.label += "Follow the Gap, "
-                    print(self.step_reward)
-                    car.ftg_laptime += self.step_reward
-                    futures.append(executor.submit(car.ftg_controller.process_lidar, self.obs['scans'][i]))
-                else:
+            for index, car in enumerate(self.cars):
+                car.future = None
+                self.check_intersection(car, index)
+
+                if car.control_count == 10:
+                    car.ftg = False
                     self.label += "MPC, "
-                    futures.append(executor.submit(car.mpc_controller.step, self.obs))
+                    car.future = executor.submit(car.mpc_controller.step, self.obs)
                     car.control_count = 0
+                if car.intersect or car.ftg:
+                    car.ftg = True
+                    self.label += "Follow the Gap, "
+                    car.ftg_laptime += self.step_reward
+                    car.future = executor.submit(car.ftg_controller.process_lidar, self.obs['scans'][index])
 
-        for future, car, reach_color in itertools.zip_longest(futures, self.cars, self.colors):
-            speed, steer, state = future.result()
-            actions.append([steer, speed])
-            car.control_count +=1
+        for car, reach_color in zip(self.cars, self.colors):
+            if car.future:
+                speed, steer, state = car.future.result()
+                car.action = [steer, speed]
 
-            if not car.ftg:
-                car.rm_plotted_reach_sets()
-                vertices_list, polys = reach.reachability(car.mpc_controller.controller.oa, car.mpc_controller.controller.odelta,
-                                                          car.mpc_controller.num, state, self.env.renderer.batch, reach_color)
-                car.vertices_list += vertices_list
-                car.reachset = polys
 
-        actions = np.array(actions)
+                if not car.ftg:
+                    car.rm_plotted_reach_sets()
+                    vertices_list, polys = reach.reachability(car.mpc_controller.controller.oa, car.mpc_controller.controller.odelta,
+                                                              car.mpc_controller.num, state, self.env.renderer.batch, reach_color)
+                    car.vertices_list += vertices_list
+                    car.reachset = polys
 
-        return actions
-    def rm_plotted_reach_sets(self):
-        # AH: removes added vertex
-        if self.vertices_list:
-            for vertex_list in self.vertices_list:
-                vertex_list.delete()
-            self.vertices_list = []
+            if car.action:
+                actions.append(car.action)
+            else:
+                raise Exception("No valid action given for car")
+            self.actions = np.array(actions)
+
+        car.control_count += 1
 
     def check_zoom(self, zoom):
         if not zoom:
@@ -125,37 +122,24 @@ class GymRunner(object):
             self.env.renderer.left = 7 * -560.0
             self.env.renderer.right = 7 * 560.0
 
-    # def select_control(self, ftg_laptime):
-    #     if self.control_count == 10:
-    #         self.rm_plotted_reach_sets()
-    #         self.actions = self.mpc()
-    #         self.control_count = 0
-    #         self.ftg = False
-    #         self.label = "MPC"
-    #
-    #     if self.intersect or self.ftg:
-    #         self.actions = self.follow_the_gap()
-    #         self.ftg = True
-    #         ftg_laptime += self.step_reward
-    #         self.label = "Follow the Gap"
-    #         # time.sleep(0.1)
-
-    def check_intersection(self, all_car_polys):
-        for i, polys in enumerate(all_car_polys):
-            for final_reach_poly in polys:
-                reachpoly = shapely_poly(final_reach_poly.V)
-                #check intersection with obstacles
-                for map_obstacle in map_obstacles:
-                    p = Point(map_obstacle)
-                    c = p.buffer(0.75).boundary
-                    if c.intersects(reachpoly):
-                        self.intersect = True
-                # check intersection of vehicles with one another
-                for x in range(len(all_car_polys)-1-i):
-                    for other_reachpoly in all_car_polys[-(x+1)]:
-                        other_reachpoly = shapely_poly(other_reachpoly.V)
-                        if other_reachpoly.intersects(reachpoly):
-                            self.intersect = True
+    def check_intersection(self, car, index):
+        car.intersect = False
+        for final_reach_poly in car.reachset:
+            reachpoly = shapely_poly(final_reach_poly.V)
+            #check intersection with obstacles
+            for map_obstacle in map_obstacles:
+                p = Point(map_obstacle)
+                c = p.buffer(0.75).boundary
+                if c.intersects(reachpoly):
+                    car.intersect = True
+            # check intersection of vehicles with one another
+            for x in range(len(self.cars)-1-index):
+                other_car = self.cars[-(x+1)]
+                for other_reachpoly in other_car.reachset:
+                    other_reachpoly = shapely_poly(other_reachpoly.V)
+                    if other_reachpoly.intersects(reachpoly):
+                        car.intersect = True
+                        other_car.intersect = True
 
 
     def camera_follow(self, old_cam_point):
@@ -185,14 +169,13 @@ class GymRunner(object):
             color=(255, 255, 255, 255), batch=self.env.renderer.batch)
 
         while not self.done and self.env.renderer.alive:
-            self.intersect = False
 
             self.check_zoom(zoom)
-            actions = self.select_control(ftg_laptime)
+            self.select_control(ftg_laptime)
 
             old_cam_point = [self.obs['poses_x'][0], self.obs['poses_y'][0]]
             pyglet_label.text = self.label
-            self.obs, self.step_reward, self.done, self.info = self.env.step(actions)
+            self.obs, self.step_reward, self.done, self.info = self.env.step(self.actions)
 
             self.camera_follow(old_cam_point)
             laptime += self.step_reward
