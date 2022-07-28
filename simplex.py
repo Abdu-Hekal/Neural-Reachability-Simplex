@@ -77,31 +77,25 @@ class GymRunner(object):
 
     def select_control(self, ftg_laptime):
         actions = []
-        self.label = ""
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            for index, car in enumerate(self.cars):
-                car.future = None
-                self.check_intersection(car, index)
+        for index, (car,reach_color)  in enumerate(zip(self.cars,self.colors)):
+            car.future = None
+            self.check_intersection(car, index)
+            if car.control_count == 10:
+                car.rm_plotted_reach_sets()
+                car.ftg = False
+                self.label = "MPC"
+                car.future = car.mpc_controller.step(self.obs)
+                car.control_count = 0
+            if car.intersect or car.ftg:
+                car.ftg = True
+                self.label = "Follow the Gap"
+                car.ftg_laptime += self.step_reward
+                car.future = car.ftg_controller.process_lidar(self.obs['scans'][index])
 
-                if car.control_count == 10:
-                    car.ftg = False
-                    self.label += "MPC, "
-                    car.future = executor.submit(car.mpc_controller.step, self.obs)
-                    car.control_count = 0
-                if car.intersect or car.ftg:
-                    car.ftg = True
-                    self.label += "Follow the Gap, "
-                    car.ftg_laptime += self.step_reward
-                    car.future = executor.submit(car.ftg_controller.process_lidar, self.obs['scans'][index])
-
-        for car, reach_color in zip(self.cars, self.colors):
             if car.future:
-                speed, steer, state = car.future.result()
+                speed, steer, state = car.future
                 car.action = [steer, speed]
-
-
                 if not car.ftg:
-                    car.rm_plotted_reach_sets()
                     vertices_list, polys = reach.reachability(car.mpc_controller.controller.oa, car.mpc_controller.controller.odelta,
                                                               car.mpc_controller.num, state, self.env.renderer.batch, reach_color)
                     car.vertices_list += vertices_list
@@ -111,9 +105,9 @@ class GymRunner(object):
                 actions.append(car.action)
             else:
                 raise Exception("No valid action given for car")
-            self.actions = np.array(actions)
 
-        car.control_count += 1
+            self.actions = np.array(actions)
+            car.control_count += 1
 
     def check_zoom(self, zoom):
         if not zoom:
