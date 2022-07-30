@@ -59,9 +59,9 @@ class GymRunner(object):
         self.actions = None
 
     def __getstate__(self):
-        return self.cars
-    def __setstate__(self, cars):
-        self.cars = cars
+        return self.__dict__
+    def __setstate__(self, d):
+        self.__dict__ = d
 
     def setup_env(self):
         with open('obstacle_map/new_config_Spielberg_map.yaml') as file:
@@ -142,11 +142,8 @@ class GymRunner(object):
     def check_one_poly_intersection(self, final_reach_poly, index):
         intersect = False
         reachpoly = shapely_poly(final_reach_poly.V)
-        map_obstacles = [[-58.51379908, 31.52080008], [-43.27495834, 37.9264539], [-48.63789174, 32.03631021],
-                         [-30.77788556, 19.68154824], [-20.39962477, 24.76222363], [15.35970888, 25.54368615],
-                         [22.28650099, 15.74832835], [17.20246417, 4.848844867]]
         # check intersection with obstacles
-        for map_obstacle in map_obstacles:
+        for map_obstacle in self.map_obstacles:
             p = Point(map_obstacle)
             c = p.buffer(0.75).boundary
             if c.intersects(reachpoly):
