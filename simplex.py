@@ -119,21 +119,24 @@ class GymRunner(object):
     def check_intersection(self, car, index):
         car.intersect = False
         for final_reach_poly in car.reachset:
-            reachpoly = shapely_poly(final_reach_poly.V)
-            #check intersection with obstacles
-            for map_obstacle in map_obstacles:
-                p = Point(map_obstacle)
-                c = p.buffer(0.75).boundary
-                if c.intersects(reachpoly):
+            self.check_one_poly_intersection(car, final_reach_poly, index)
+
+    def check_one_poly_intersection(self, car, final_reach_poly, index):
+        reachpoly = shapely_poly(final_reach_poly.V)
+        # check intersection with obstacles
+        for map_obstacle in map_obstacles:
+            p = Point(map_obstacle)
+            c = p.buffer(0.75).boundary
+            if c.intersects(reachpoly):
+                car.intersect = True
+        # check intersection of vehicles with one another
+        for x in range(len(self.cars) - 1 - index):
+            other_car = self.cars[-(x + 1)]
+            for other_reachpoly in other_car.reachset:
+                other_reachpoly = shapely_poly(other_reachpoly.V)
+                if other_reachpoly.intersects(reachpoly):
                     car.intersect = True
-            # check intersection of vehicles with one another
-            for x in range(len(self.cars)-1-index):
-                other_car = self.cars[-(x+1)]
-                for other_reachpoly in other_car.reachset:
-                    other_reachpoly = shapely_poly(other_reachpoly.V)
-                    if other_reachpoly.intersects(reachpoly):
-                        car.intersect = True
-                        other_car.intersect = True
+                    other_car.intersect = True
 
 
     def camera_follow(self, old_cam_point):
