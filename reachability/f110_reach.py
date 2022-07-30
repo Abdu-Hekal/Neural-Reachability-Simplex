@@ -34,7 +34,6 @@ def reachability(oa, odelta, car_num, state, batch, color):
 
     return vertices_list, polys
 
-
 def compute_reachsets(oa, odelta, state):
     input_list = []
     pyglet.gl.glEnable(pyglet.gl.GL_BLEND)

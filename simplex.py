@@ -17,6 +17,8 @@ from controllers.drivers import GapFollower
 import reachability.f110_reach as reach
 from shapely.geometry import Point
 from shapely.geometry import Polygon as shapely_poly
+import multiprocessing as mp
+
 
 class Car:
     def __init__(self, mpc_controller, ftg_controller):
@@ -30,6 +32,11 @@ class Car:
         self.reachset = []
         self.ftg_laptime = 0
         self.vertices_list = []
+
+    def __getstate__(self):
+        return self.reachset
+    def __setstate__(self, reachset):
+        self.reachset = reachset
 
     def rm_plotted_reach_sets(self):
         # AH: removes added vertex
@@ -50,6 +57,11 @@ class GymRunner(object):
         self.setup_mpcs()
         self.setup_colors()
         self.actions = None
+
+    def __getstate__(self):
+        return self.cars
+    def __setstate__(self, cars):
+        self.cars = cars
 
     def setup_env(self):
         with open('obstacle_map/new_config_Spielberg_map.yaml') as file:
@@ -77,6 +89,7 @@ class GymRunner(object):
 
     def select_control(self, ftg_laptime):
         actions = []
+
         for index, (car,reach_color)  in enumerate(zip(self.cars,self.colors)):
             car.future = None
             self.check_intersection(car, index)
@@ -105,9 +118,9 @@ class GymRunner(object):
                 actions.append(car.action)
             else:
                 raise Exception("No valid action given for car")
-
-            self.actions = np.array(actions)
             car.control_count += 1
+
+        self.actions = np.array(actions)
 
     def check_zoom(self, zoom):
         if not zoom:
@@ -118,25 +131,36 @@ class GymRunner(object):
 
     def check_intersection(self, car, index):
         car.intersect = False
-        for final_reach_poly in car.reachset:
-            self.check_one_poly_intersection(car, final_reach_poly, index)
 
-    def check_one_poly_intersection(self, car, final_reach_poly, index):
+        result_objects = [pool.apply_async(self.check_one_poly_intersection, (final_reach_poly, index)) for final_reach_poly in car.reachset]
+        # x = [2]*10
+        # result_objects = [pool.apply_async(my_try, (z, x)) for z in range(10)]
+        intersect = [r.get() for r in result_objects]
+        print(any(intersect))
+
+
+    def check_one_poly_intersection(self, final_reach_poly, index):
+        intersect = False
         reachpoly = shapely_poly(final_reach_poly.V)
+        map_obstacles = [[-58.51379908, 31.52080008], [-43.27495834, 37.9264539], [-48.63789174, 32.03631021],
+                         [-30.77788556, 19.68154824], [-20.39962477, 24.76222363], [15.35970888, 25.54368615],
+                         [22.28650099, 15.74832835], [17.20246417, 4.848844867]]
         # check intersection with obstacles
         for map_obstacle in map_obstacles:
             p = Point(map_obstacle)
             c = p.buffer(0.75).boundary
             if c.intersects(reachpoly):
-                car.intersect = True
+                intersect = True
         # check intersection of vehicles with one another
         for x in range(len(self.cars) - 1 - index):
             other_car = self.cars[-(x + 1)]
             for other_reachpoly in other_car.reachset:
                 other_reachpoly = shapely_poly(other_reachpoly.V)
                 if other_reachpoly.intersects(reachpoly):
-                    car.intersect = True
+                    intersect = True
                     other_car.intersect = True
+
+        return intersect
 
 
     def camera_follow(self, old_cam_point):
@@ -173,6 +197,7 @@ class GymRunner(object):
             old_cam_point = [self.obs['poses_x'][0], self.obs['poses_y'][0]]
             pyglet_label.text = self.label
             self.obs, self.step_reward, self.done, self.info = self.env.step(self.actions)
+            print(self.actions)
 
             self.camera_follow(old_cam_point)
             laptime += self.step_reward
@@ -182,6 +207,9 @@ class GymRunner(object):
                 break;
 
         self.end_sim(laptime, ftg_laptime, start)
+
+def my_try(z, x):
+    return x*2
 
 
 if __name__ == '__main__':
@@ -202,5 +230,10 @@ if __name__ == '__main__':
     cars = []
     for i in range(num):
         cars.append(Car(MPC(), GapFollower()))
+
+    pool = mp.Pool(mp.cpu_count())
     runner = GymRunner(cars, map_obstacles)
     runner.run(zoom)
+    pool.close()
+    pool.join()
+
