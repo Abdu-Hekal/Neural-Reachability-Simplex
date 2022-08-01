@@ -6,38 +6,11 @@ from argparse import Namespace
 import math
 from numba import njit
 import cvxpy
-import matplotlib.pyplot as plt
 import pickle
 
 # --------------------------- Controller Paramter ---------------------------
-# System config
-NX = 4  # state vector: z = [x, y, v, yaw]
-NU = 2  # input vector: u = = [accel, steer]
-T = 5  # finite time horizon length
-
-# MPC parameters
-R = np.diag([0.01, 100.0])  # input cost matrix, penalty for inputs - [accel, steer]
-Rd = np.diag([0.01, 100.0])  # input difference cost matrix, penalty for change of inputs - [accel, steer]
-Q = np.diag([13.5, 13.5, 5.5, 13.0])  # state cost matrix, for the the next (T) prediction time steps [x, y, v, yaw]
-Qf = np.diag([13.5, 13.5, 5.5, 13.0])  # state final matrix, penalty  for the final state constraints: [x, y, v, yaw]
 
 
-# Iterative paramter
-MAX_ITER = 1  # Max iteration
-DU_TH = 0.01  # Threshold for stopping iteration
-N_IND_SEARCH = 5  # Search index number
-DT = 0.10  # time step [s]
-dl = 0.20  # dist step [m]
-
-# Vehicle parameters
-LENGTH = 0.58  # Length of the vehicle [m]
-WIDTH = 0.31  # Width of the vehicle [m]
-WB = 0.33  # Wheelbase [m]
-MAX_STEER = 0.4189  # maximum steering angle [rad] from f1tenth gym library
-MAX_DSTEER = 3.2  # maximum steering speed [rad/s] from f1tenth gym library
-MAX_SPEED = 5 # maximum speed [m/s] from training data on flowstar
-MIN_SPEED = 0  # minimum backward speed [m/s]
-MAX_ACCEL = 9.51  # maximum acceleration [m/ss] from f1tenth gym library
 
 """ 
 Planner Helpers
@@ -118,6 +91,9 @@ def nearest_point_on_trajectory(point, trajectory):
     min_dist_segment = np.argmin(dists)
     return projections[min_dist_segment], dists[min_dist_segment], t[min_dist_segment], min_dist_segment
 
+def get_nparray_from_matrix(x):
+    return np.array(x).flatten()
+
 
 @njit(fastmath=False, cache=True)
 def pi_2_pi(angle):
@@ -144,7 +120,7 @@ class State:
 
 class Controller:
 
-    def __init__(self, conf):
+    def __init__(self, conf, car, init_target_ind=0):
         self.conf = conf
         self.load_waypoints(conf)
         self.mpc_initialize = 0
@@ -152,6 +128,28 @@ class Controller:
         self.odelta = None
         self.oa = None
         self.origin_switch = 1
+        self.car = car
+        self.init_target_ind = init_target_ind
+
+        # System config
+        self.NX = 4  # state vector: z = [x, y, v, yaw]
+        self.NU = 2  # input vector: u = = [accel, steer]
+        self.T = 5  # finite time horizon length
+
+        # MPC parameters
+        self.R = np.diag([0.01, 100.0])  # input cost matrix, penalty for inputs - [accel, steer]
+        self.Rd = np.diag([0.01, 100.0])  # input difference cost matrix, penalty for change of inputs - [accel, steer]
+        self.Q = np.diag(
+            [13.5, 13.5, 5.5, 13.0])  # state cost matrix, for the the next (T) prediction time steps [x, y, v, yaw]
+        self.Qf = np.diag(
+            [13.5, 13.5, 5.5, 13.0])  # state final matrix, penalty  for the final state constraints: [x, y, v, yaw]
+
+        # Iterative paramter
+        self.MAX_ITER = 1  # Max iteration
+        self.DU_TH = 0.01  # Threshold for stopping iteration
+        self.N_IND_SEARCH = 5  # Search index number
+        self.DT = 0.10  # time step [s]
+        self.dl = 0.20  # dist step [m]
 
     def load_waypoints(self, conf):
         # Loading the x and y waypoints in the "..._raceline.vsv" that include the path to follow
@@ -165,16 +163,16 @@ class Controller:
         """
 
         if pind == len(cx) - 1:
-            dx = [state.x - icx for icx in cx[0:(0 + N_IND_SEARCH)]]
-            dy = [state.y - icy for icy in cy[0:(0 + N_IND_SEARCH)]]
+            dx = [state.x - icx for icx in cx[0:(0 + self.N_IND_SEARCH)]]
+            dy = [state.y - icy for icy in cy[0:(0 + self.N_IND_SEARCH)]]
 
             d = [idx ** 2 + idy ** 2 for (idx, idy) in zip(dx, dy)]
             mind = min(d)
             ind = d.index(mind) + 0
 
         else:
-            dx = [state.x - icx for icx in cx[pind:(pind + N_IND_SEARCH)]]
-            dy = [state.y - icy for icy in cy[pind:(pind + N_IND_SEARCH)]]
+            dx = [state.x - icx for icx in cx[pind:(pind + self.N_IND_SEARCH)]]
+            dy = [state.y - icy for icy in cy[pind:(pind + self.N_IND_SEARCH)]]
 
             d = [idx ** 2 + idy ** 2 for (idx, idy) in zip(dx, dy)]
             mind = min(d)
@@ -203,12 +201,12 @@ class Controller:
         """
 
         # Create placeholder Arrays for the reference trajectory for T steps
-        ref_traj = np.zeros((NX, T + 1))
-        dref = np.zeros((1, T + 1))
+        ref_traj = np.zeros((self.NX, self.T + 1))
+        dref = np.zeros((1, self.T + 1))
         ncourse = len(cx)
 
         # Find nearest index/setpoint from where the trajectories are calculated
-        ind, _ = Controller.calc_nearest_index(self, state, cx, cy, cyaw, pind)
+        ind, _ = self.calc_nearest_index(state, cx, cy, cyaw, pind)
 
         # if pind >= ind:
         #    ind = pind
@@ -224,8 +222,8 @@ class Controller:
         travel = 0.0
         self.origin_switch = 1
 
-        for i in range(T + 1):
-            travel += abs(state.v) * DT  # Travel Distance into the future based on current velocity: s= v * t
+        for i in range(self.T + 1):
+            travel += abs(state.v) * self.DT  # Travel Distance into the future based on current velocity: s= v * t
             dind = int(round(travel / dl))  # Number of distance steps we need to look into the future
 
             if (ind + dind) < ncourse:
@@ -252,14 +250,14 @@ class Controller:
 
         return ref_traj, ind, dref
 
-    def predict_motion(x0, oa, od, xref):
+    def predict_motion(self, x0, oa, od, xref):
         path_predict = xref * 0.0
         for i, _ in enumerate(x0):
             path_predict[i, 0] = x0[i]
 
         state = State(x=x0[0], y=x0[1], yaw=x0[3], v=x0[2])
-        for (ai, di, i) in zip(oa, od, range(1, T + 1)):
-            state = Controller.update_state(state, ai, di)
+        for (ai, di, i) in zip(oa, od, range(1, self.T + 1)):
+            state = self.update_state(state, ai, di)
             path_predict[0, i] = state.x
             path_predict[1, i] = state.y
             path_predict[2, i] = state.v
@@ -267,28 +265,28 @@ class Controller:
 
         return path_predict
 
-    def update_state(state, a, delta):
+    def update_state(self, state, a, delta):
 
         # input check
-        if delta >= MAX_STEER:
-            delta = MAX_STEER
-        elif delta <= -MAX_STEER:
-            delta = -MAX_STEER
+        if delta >= self.car.MAX_STEER:
+            delta = self.car.MAX_STEER
+        elif delta <= -self.car.MAX_STEER:
+            delta = -self.car.MAX_STEER
 
-        state.x = state.x + state.v * math.cos(state.yaw) * DT
-        state.y = state.y + state.v * math.sin(state.yaw) * DT
-        state.yaw = state.yaw + state.v / WB * math.tan(delta) * DT
-        state.v = state.v + a * DT
+        state.x = state.x + state.v * math.cos(state.yaw) * self.DT
+        state.y = state.y + state.v * math.sin(state.yaw) * self.DT
+        state.yaw = state.yaw + state.v / self.car.WB * math.tan(delta) * self.DT
+        state.v = state.v + a * self.DT
 
-        if state.v > MAX_SPEED:
-            state.v = MAX_SPEED
-        elif state.v < MIN_SPEED:
-            state.v = MIN_SPEED
+        if state.v > self.car.MAX_SPEED:
+            state.v = self.car.MAX_SPEED
+        elif state.v < self.car.MIN_SPEED:
+            state.v = self.car.MIN_SPEED
 
         return state
 
     @njit(fastmath=False, cache=True)
-    def get_linear_model_matrix(v, phi, delta):
+    def get_linear_model_matrix(NX, NU, DT, WB, v, phi, delta):
         """
            calc linear and discrete time dynamic model.
            :param v: speed: v_bar
@@ -319,10 +317,7 @@ class Controller:
 
         return A, B, C
 
-    def get_nparray_from_matrix(x):
-        return np.array(x).flatten()
-
-    def iterative_linear_mpc_control(ref_path, x0, dref, oa, od):
+    def iterative_linear_mpc_control(self, ref_path, x0, dref, oa, od):
         """
         MPC contorl with updating operational point iteraitvely
         :param ref_path: reference trajectory in T steps
@@ -333,28 +328,28 @@ class Controller:
         """
 
         if oa is None or od is None:
-            oa = [0.0] * T
-            od = [0.0] * T
+            oa = [0.0] * self.T
+            od = [0.0] * self.T
 
         # Run the MPC calculation iterativly
-        for i in range(MAX_ITER):
+        for i in range(self.MAX_ITER):
 
             # Call the Motion Prediction function. Prediction the vehicle motion for x-steps
-            path_predict = Controller.predict_motion(x0, oa, od, ref_path)
+            path_predict = self.predict_motion(x0, oa, od, ref_path)
             poa, pod = oa[:], od[:]
 
             # Call the Linear MPC Function
-            mpc_a, mpc_delta, mpc_x, mpc_y, mpc_yaw, mpc_v = Controller.linear_mpc_control(ref_path, path_predict, x0,
+            mpc_a, mpc_delta, mpc_x, mpc_y, mpc_yaw, mpc_v = self.linear_mpc_control(ref_path, path_predict, x0,
                                                                                            dref)
 
             # Calculta the u change value
             du = sum(abs(mpc_a - poa)) + sum(abs(mpc_delta - pod))
-            if du <= DU_TH:
+            if du <= self.DU_TH:
                 break
 
         return mpc_a, mpc_delta, mpc_x, mpc_y, mpc_yaw, mpc_v
 
-    def linear_mpc_control(ref_traj, path_predict, x0, dref):
+    def linear_mpc_control(self, ref_traj, path_predict, x0, dref):
         """
         solve the quadratic optimization problem using cvxpy, solver: OSQP
         xref: reference trajectory (desired trajectory: [x, y, v, yaw])
@@ -365,43 +360,43 @@ class Controller:
         """
 
         # Initialize vectors
-        x = cvxpy.Variable((NX, T + 1))  # Vehicle State Vector
-        u = cvxpy.Variable((NU, T))  # Control Input vector
+        x = cvxpy.Variable((self.NX, self.T + 1))  # Vehicle State Vector
+        u = cvxpy.Variable((self.NU, self.T))  # Control Input vector
         cost = 0.0  # Set costs to zero
         constraints = []  # Create constraints array
 
-        for t in range(T):
-            cost += cvxpy.quad_form(u[:, t], R)
+        for t in range(self.T):
+            cost += cvxpy.quad_form(u[:, t], self.R)
 
             if t != 0:
-                cost += cvxpy.quad_form(ref_traj[:, t] - x[:, t], Q)
+                cost += cvxpy.quad_form(ref_traj[:, t] - x[:, t], self.Q)
 
-            A, B, C = Controller.get_linear_model_matrix(path_predict[2, t], path_predict[3, t], dref[0, t])
+            A, B, C = Controller.get_linear_model_matrix(self.NX, self.NU, self.DT, self.car.WB,path_predict[2, t], path_predict[3, t], dref[0, t])
             constraints += [x[:, t + 1] == A @ x[:, t] + B @ u[:, t] + C]
 
-            if t < (T - 1):
-                cost += cvxpy.quad_form(u[:, t + 1] - u[:, t], Rd)
-                constraints += [cvxpy.abs(u[1, t + 1] - u[1, t]) <= MAX_DSTEER * DT]
+            if t < (self.T - 1):
+                cost += cvxpy.quad_form(u[:, t + 1] - u[:, t], self.Rd)
+                constraints += [cvxpy.abs(u[1, t + 1] - u[1, t]) <= self.car.MAX_DSTEER * self.DT]
 
-        cost += cvxpy.quad_form(ref_traj[:, T] - x[:, T], Qf)
+        cost += cvxpy.quad_form(ref_traj[:, self.T] - x[:, self.T], self.Qf)
 
         constraints += [x[:, 0] == x0]
-        constraints += [x[2, :] <= MAX_SPEED]
-        constraints += [x[2, :] >= MIN_SPEED]
-        constraints += [cvxpy.abs(u[0, :]) <= MAX_ACCEL]
-        constraints += [cvxpy.abs(u[1, :]) <= MAX_STEER]
+        constraints += [x[2, :] <= self.car.MAX_SPEED]
+        constraints += [x[2, :] >= self.car.MIN_SPEED]
+        constraints += [cvxpy.abs(u[0, :]) <= self.car.MAX_ACCEL]
+        constraints += [cvxpy.abs(u[1, :]) <= self.car.MAX_STEER]
 
         prob = cvxpy.Problem(cvxpy.Minimize(cost), constraints)
         # prob.solve(solver=cvxpy.GUROBI, verbose=True, warm_start= True)
         prob.solve(solver=cvxpy.OSQP, verbose=False, warm_start=True)
 
         if prob.status == cvxpy.OPTIMAL or prob.status == cvxpy.OPTIMAL_INACCURATE:
-            ox = Controller.get_nparray_from_matrix(x.value[0, :])
-            oy = Controller.get_nparray_from_matrix(x.value[1, :])
-            ov = Controller.get_nparray_from_matrix(x.value[2, :])
-            oyaw = Controller.get_nparray_from_matrix(x.value[3, :])
-            oa = Controller.get_nparray_from_matrix(u.value[0, :])
-            odelta = Controller.get_nparray_from_matrix(u.value[1, :])
+            ox = get_nparray_from_matrix(x.value[0, :])
+            oy = get_nparray_from_matrix(x.value[1, :])
+            ov = get_nparray_from_matrix(x.value[2, :])
+            oyaw = get_nparray_from_matrix(x.value[3, :])
+            oa = get_nparray_from_matrix(u.value[0, :])
+            odelta = get_nparray_from_matrix(u.value[1, :])
 
         else:
             print("Error: Cannot solve mpc..")
@@ -411,14 +406,6 @@ class Controller:
 
     def MPC_Controller(self, vehicle_state, path):
 
-        # --------------------------- Inititalize ---------------------------
-        # Initialize the MPC parameter
-        if self.mpc_initialize == 0:
-            # self.target_ind, _ = Controller.calc_nearest_index(vehicle_state, cx, cy, cyaw, 0)
-            self.target_ind = 0
-            self.odelta, self.oa = None, None
-            self.mpc_initialize = 1
-
         # ------------------- MPC CONTROL LOOP ---------------------------------
         # Extract information about the path that needs to be followed
         cx = path[0]
@@ -426,65 +413,26 @@ class Controller:
         cyaw = path[2]
         sp = path[4]
 
+        # --------------------------- Inititalize ---------------------------
+        # Initialize the MPC parameter
+        if self.mpc_initialize == 0:
+            self.target_ind, _ = self.calc_nearest_index(vehicle_state, cx, cy, cyaw, self.init_target_ind)
+            self.odelta, self.oa = None, None
+            self.mpc_initialize = 1
+
         # Calculate the next reference trajectory for the next T steps:: [x, y, v, yaw]
-        ref_path, self.target_ind, ref_delta = Controller.calc_ref_trajectory(self, vehicle_state, cx, cy, cyaw, sp, dl,
+        ref_path, self.target_ind, ref_delta = self.calc_ref_trajectory(vehicle_state, cx, cy, cyaw, sp, self.dl,
                                                                               self.target_ind)
 
         # Create State Vector based on current vehicle state: x-position, y-position,  velocity, heading
         x0 = [vehicle_state.x, vehicle_state.y, vehicle_state.v, vehicle_state.yaw]
 
         # Solve the Linear MPC Control problem
-        self.oa, self.odelta, ox, oy, oyaw, ov = Controller.iterative_linear_mpc_control(ref_path, x0, ref_delta,
+        self.oa, self.odelta, ox, oy, oyaw, ov = self.iterative_linear_mpc_control(ref_path, x0, ref_delta,
                                                                                          self.oa, self.odelta)
-
-        if self.odelta is not None:
-            di, ai = self.odelta[0], self.oa[0]
-
-        ###########################################
-        #                    DEBUG
-        ##########################################
-
-        debugplot = 0
-        if debugplot == 1:
-            plt.cla()
-            # plt.axis([-40, 2, -10, 10])
-            plt.axis([vehicle_state.x - 6, vehicle_state.x + 4.5, vehicle_state.y - 2.5, vehicle_state.y + 2.5])
-            plt.plot(self.waypoints[:, [1]], self.waypoints[:, [2]], linestyle='solid', linewidth=2, color='#005293',
-                     label='Raceline')
-            plt.plot(vehicle_state.x, vehicle_state.y, marker='o', markersize=10, color='red', label='CoG')
-            plt.plot(ref_path[0], ref_path[1], linestyle='dotted', linewidth=8, color='purple',
-                     label='MPC Input: Ref. Trajectory for T steps')
-            # plt.plot(cx[self.target_ind], cy[self.target_ind], marker='x', markersize=10, color='green',)
-            plt.plot(ox, oy, linestyle='dotted', linewidth=5, color='green', label='MPC Output: Trajectory for T steps')
-            plt.legend()
-            plt.pause(0.001)
-            plt.axis('equal')
-
-        debugplot2 = 0
-        if debugplot2 == 1:
-            plt.cla()
-            # Creating the number of subplots
-            fig, axs = plt.subplots(3, 1)
-            #  Velocity of the vehicle
-            axs[0].plot(ov, linestyle='solid', linewidth=2, color='#005293')
-            axs[0].set_ylim([0, max(ov) + 0.5])
-            axs[0].set(ylabel='Velocity in m/s')
-            axs[0].grid(axis="both")
-
-            axs[1].plot(self.oa, linestyle='solid', linewidth=2, color='#005293')
-            axs[1].set_ylim([0, max(self.oa) + 0.5])
-            axs[1].set(ylabel='Acceleration in m/s')
-            axs[1].grid(axis="both")
-            plt.pause(0.001)
-            plt.axis('equal')
-
-        ###########################################
-        #                    DEBUG
-        ##########################################
 
         # ------------------- MPC CONTROL Output ---------------------------------
         # Create the final steer and speed parameter that need to be sent out
-
         # Steering Output: First entry of the MPC steering angle output vector in degree
         steer_output = self.odelta[0]
 
@@ -493,7 +441,7 @@ class Controller:
         # accelerate
         # speed_output=self.oa[0]*T*DT
         # speed_output=ref_path[2][1]*0.50
-        speed_output = vehicle_state.v + self.oa[0] * DT
+        speed_output = vehicle_state.v + self.oa[0] * self.DT
 
 
         return speed_output, steer_output

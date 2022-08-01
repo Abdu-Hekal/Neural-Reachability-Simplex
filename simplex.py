@@ -1,15 +1,12 @@
 import random
 import time
-import itertools
-
 import gym
 import numpy as np
-import concurrent.futures
-
 import pyglet
 import yaml
 from argparse import Namespace, ArgumentParser, ArgumentDefaultsHelpFormatter
 
+from car import Car
 from controllers.mpc import MPC
 from map.start_point import get_rand_start_point
 from obstacle_map import draw
@@ -19,34 +16,6 @@ from shapely.geometry import Point
 from shapely.geometry import Polygon as shapely_poly
 import multiprocessing as mp
 
-
-class Car:
-    def __init__(self, mpc_controller, ftg_controller):
-        self.control_count = 10
-        self.mpc_controller = mpc_controller
-        self.ftg_controller = ftg_controller
-        self.action = None
-        self.future = None
-        self.intersect = False
-        self.ftg = False
-        self.reachset = []
-        self.ftg_laptime = 0
-        self.vertices_list = []
-
-    def __getstate__(self):
-        return self.reachset
-    def __setstate__(self, reachset):
-        self.reachset = reachset
-
-    def rm_plotted_reach_sets(self):
-        # AH: removes added vertex
-        if self.vertices_list:
-            for vertex_list in self.vertices_list:
-                vertex_list.delete()
-            self.vertices_list = []
-
-
-
 class GymRunner(object):
 
     def __init__(self, cars, map_obstacles):
@@ -55,13 +24,9 @@ class GymRunner(object):
         self.label = ""
         self.setup_env()
         self.setup_mpcs()
+        self.setup_start_points()
         self.setup_colors()
         self.actions = None
-
-    def __getstate__(self):
-        return self.__dict__
-    def __setstate__(self, d):
-        self.__dict__ = d
 
     def setup_env(self):
         with open('obstacle_map/new_config_Spielberg_map.yaml') as file:
@@ -69,18 +34,21 @@ class GymRunner(object):
         self.conf = Namespace(**conf_dict)
         self.env = gym.make('f110_gym:f110-v0', map=self.conf.map_path, map_ext=self.conf.map_ext,
                             num_agents=len(self.cars))
+
+    def setup_start_points(self):
         start_points = get_rand_start_point('map/Spielberg_raceline.csv', len(self.cars))
         env_array = []
-        for start_point in start_points:
-            point_array = start_point.split(";")
+        for start_point, car in zip(start_points,self.cars):
+            index, point = start_point
+            point_array = point.split(";")
             env_array.append([float(point_array[1]), float(point_array[2]), float(point_array[3])])
-            #env_array.append([-0.0440806, -0.8491629, 3.4034118])
+            car.mpc_controller.controller.init_target_ind = index
         self.obs, self.step_reward, self.done, self.info = self.env.reset(np.array(env_array))
         self.env.render()
 
     def setup_mpcs(self):
-        for i, car in enumerate(cars):
-            car.mpc_controller.setup(self.conf, self.env, i)
+        for car in cars:
+            car.mpc_controller.setup(self.conf, self.env, car)
 
     def setup_colors(self):
         self.colors = []
@@ -97,22 +65,21 @@ class GymRunner(object):
                 car.rm_plotted_reach_sets()
                 car.ftg = False
                 self.label = "MPC"
-                car.future = car.mpc_controller.step(self.obs)
+                speed, steer, state = car.mpc_controller.step(self.obs)
+                car.action = [steer, speed]
+                vertices_list, polys = reach.reachability(car.mpc_controller.controller.oa, car.mpc_controller.controller.odelta,
+                                                          car.mpc_controller.num, state, self.env.renderer.batch, reach_color)
+                car.vertices_list += vertices_list
+                car.reachset = polys
                 car.control_count = 0
             if car.intersect or car.ftg:
                 car.ftg = True
                 self.label = "Follow the Gap"
+                speed, steer, state = car.ftg_controller.process_lidar(self.obs['scans'][i])
+                car.action = [steer, speed]
                 car.ftg_laptime += self.step_reward
                 car.future = car.ftg_controller.process_lidar(self.obs['scans'][index])
 
-            if car.future:
-                speed, steer, state = car.future
-                car.action = [steer, speed]
-                if not car.ftg:
-                    vertices_list, polys = reach.reachability(car.mpc_controller.controller.oa, car.mpc_controller.controller.odelta,
-                                                              car.mpc_controller.num, state, self.env.renderer.batch, reach_color)
-                    car.vertices_list += vertices_list
-                    car.reachset = polys
 
             if car.action:
                 actions.append(car.action)
@@ -131,12 +98,11 @@ class GymRunner(object):
 
     def check_intersection(self, car, index):
         car.intersect = False
-
         result_objects = [pool.apply_async(self.check_one_poly_intersection, (final_reach_poly, index)) for final_reach_poly in car.reachset]
-        # x = [2]*10
-        # result_objects = [pool.apply_async(my_try, (z, x)) for z in range(10)]
         intersect = [r.get() for r in result_objects]
+        car.intersect = any(intersect)
         print(any(intersect))
+
 
 
     def check_one_poly_intersection(self, final_reach_poly, index):
@@ -226,7 +192,7 @@ if __name__ == '__main__':
                      [22.28650099, 15.74832835], [17.20246417, 4.848844867]]
     cars = []
     for i in range(num):
-        cars.append(Car(MPC(), GapFollower()))
+        cars.append(Car(i, MPC(), GapFollower()))
 
     pool = mp.Pool(mp.cpu_count())
     runner = GymRunner(cars, map_obstacles)

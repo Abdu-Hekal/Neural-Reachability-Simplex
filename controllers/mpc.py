@@ -8,12 +8,12 @@ class MPC:
         self.controller = None
         self.planner = None
 
-    def setup(self, conf, env, num):
+    def setup(self, conf, env, car):
         self.planner = LatticePlanner(conf, env)
-        self.controller = Controller(conf)
+        self.controller = Controller(conf, car)
         # Load global raceline to create a path variable that includes all reference path information
         self.path = self.planner.plan()
-        self.num = num
+        self.num = car.num
 
     def step(self, obs):
         state = State(x=obs['poses_x'][self.num], y=obs['poses_y'][self.num], yaw=obs['poses_theta'][self.num],
