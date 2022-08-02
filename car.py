@@ -18,7 +18,7 @@ class Car:
         self.WB = 0.33  # Wheelbase [m]
         self.MAX_STEER = 0.4189  # maximum steering angle [rad] from f1tenth gym library
         self.MAX_DSTEER = 3.2  # maximum steering speed [rad/s] from f1tenth gym library
-        self.MAX_SPEED = 5  # maximum speed [m/s] from training data on flowstar
+        self.MAX_SPEED = 8  # maximum speed [m/s] from training data on flowstar
         self.MIN_SPEED = 0  # minimum backward speed [m/s]
         self.MAX_ACCEL = 9.51  # maximum acceleration [m/ss] from f1tenth gym library
 
