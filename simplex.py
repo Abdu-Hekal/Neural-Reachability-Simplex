@@ -15,6 +15,7 @@ import reachability.f110_reach as reach
 from shapely.geometry import Point
 from shapely.geometry import Polygon as shapely_poly
 import multiprocessing as mp
+import copy
 
 class GymRunner(object):
 
@@ -80,7 +81,7 @@ class GymRunner(object):
             if car.intersect or car.ftg:
                 car.ftg = True
                 car.label = "FTG"
-                speed, steer, state = car.ftg_controller.process_lidar(self.obs['scans'][i])
+                speed, steer, state = car.ftg_controller.process_lidar(self.obs['scans'][index], MAX_SPEED=car.MAX_SPEED)
                 car.action = [steer, speed]
                 car.ftg_laptime += self.step_reward
                 car.future = car.ftg_controller.process_lidar(self.obs['scans'][index])
@@ -189,19 +190,25 @@ if __name__ == '__main__':
                             formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument("-z", "--zoom", action="store_true", help="Zoom in camera")
     parser.add_argument("-n", "--number", type=int, default=1, help='number of vehicles')
+    parser.add_argument("-o", "--obstacles", type=int, default=5, help='number of obstacles')
     args = vars(parser.parse_args())
     zoom = args['zoom']
     num = args['number']
-    map_obstacles = [[-58.51379908, 31.52080008], [-43.27495834, 37.9264539], [-48.63789174, 32.03631021],
-                     [-30.77788556, 19.68154824], [-20.39962477, 24.76222363], [15.35970888, 25.54368615],
-                     [22.28650099, 15.74832835], [17.20246417, 4.848844867]]
-    draw.add_obstacles(map_obstacles)
-    map_obstacles = [[-58.51379908, 31.52080008], [-43.27495834, 37.9264539], [-48.63789174, 32.03631021],
-                     [-30.77788556, 19.68154824], [-20.39962477, 24.76222363], [15.35970888, 25.54368615],
-                     [22.28650099, 15.74832835], [17.20246417, 4.848844867]]
+    num_obstacles = args['obstacles']
+    rand_points = get_rand_start_point('map/Spielberg_centerline.csv', num_obstacles)
+    map_obstacles = []
+    for rand_point in rand_points:
+        index, point = rand_point
+        point_array = point.split(",")
+        map_obstacles.append([float(point_array[0]), float(point_array[1])])
+    draw.add_obstacles(copy.deepcopy(map_obstacles))
+
     cars = []
     for i in range(num):
-        cars.append(Car(i, MPC(), GapFollower()))
+        car = Car(i, MPC(), GapFollower())
+        car.MAX_SPEED = random.uniform(3,5)
+        print(f"car {i+1} max speed is {car.MAX_SPEED} m/s")
+        cars.append(car)
 
     pool = mp.Pool(mp.cpu_count())
     runner = GymRunner(cars, map_obstacles)

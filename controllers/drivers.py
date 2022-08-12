@@ -64,12 +64,9 @@ class GapFollower:
         steering_angle = lidar_angle / 2
         return steering_angle
 
-    def process_lidar(self, ranges):
+    def process_lidar(self, ranges, MAX_SPEED = 5):
         """ Process each LiDAR scan as per the Follow Gap algorithm & publish an AckermannDriveStamped Message
         """
-        MAX_STEER = 1.4189  # maximum steering angle [rad]
-        MAX_SPEED = 5  # maximum speed [m/s]
-
         proc_ranges = self.preprocess_lidar(ranges)
         # Find closest point to LiDAR
         closest = proc_ranges.argmin()
@@ -96,7 +93,6 @@ class GapFollower:
         #print('Steering angle in degrees: {}'.format((steering_angle / (np.pi / 2)) * 90))
 
         speed = min(speed, MAX_SPEED)
-        steering_angle = min(steering_angle, MAX_STEER)
 
         return speed, steering_angle, None
 
