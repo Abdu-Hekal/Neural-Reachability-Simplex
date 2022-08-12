@@ -11,6 +11,7 @@ class Car:
         self.reachset = []
         self.ftg_laptime = 0
         self.vertices_list = []
+        self.label = ""
 
         # Vehicle parameters
         self.LENGTH = 0.58  # Length of the vehicle [m]
@@ -18,14 +19,18 @@ class Car:
         self.WB = 0.33  # Wheelbase [m]
         self.MAX_STEER = 0.4189  # maximum steering angle [rad] from f1tenth gym library
         self.MAX_DSTEER = 3.2  # maximum steering speed [rad/s] from f1tenth gym library
-        self.MAX_SPEED = 8  # maximum speed [m/s] from training data on flowstar
+        self.MAX_SPEED = 5  # maximum speed [m/s] from training data on flowstar
         self.MIN_SPEED = 0  # minimum backward speed [m/s]
         self.MAX_ACCEL = 9.51  # maximum acceleration [m/ss] from f1tenth gym library
 
     def __getstate__(self):
-        return self.reachset
-    def __setstate__(self, reachset):
-        self.reachset = reachset
+        out = self.__dict__.copy()
+        del out["mpc_controller"]
+        del out["ftg_controller"]
+        del out["vertices_list"]
+        return out
+    def __setstate__(self, out):
+        self.__dict__ = out
 
     def rm_plotted_reach_sets(self):
         # AH: removes added vertex

@@ -139,10 +139,8 @@ class Controller:
         # MPC parameters
         self.R = np.diag([0.01, 100.0])  # input cost matrix, penalty for inputs - [accel, steer]
         self.Rd = np.diag([0.01, 100.0])  # input difference cost matrix, penalty for change of inputs - [accel, steer]
-        self.Q = np.diag(
-            [13.5, 13.5, 5.5, 13.0])  # state cost matrix, for the the next (T) prediction time steps [x, y, v, yaw]
-        self.Qf = np.diag(
-            [13.5, 13.5, 5.5, 13.0])  # state final matrix, penalty  for the final state constraints: [x, y, v, yaw]
+        self.Q = np.diag([13.5, 13.5, 5.5, 13.0])  # state cost matrix, for the the next (T) prediction time steps [x, y, v, yaw]
+        self.Qf = self.Q
 
         # Iterative paramter
         self.MAX_ITER = 1  # Max iteration

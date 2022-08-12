@@ -67,7 +67,7 @@ class GapFollower:
     def process_lidar(self, ranges):
         """ Process each LiDAR scan as per the Follow Gap algorithm & publish an AckermannDriveStamped Message
         """
-        MAX_STEER = 0.4189  # maximum steering angle [rad]
+        MAX_STEER = 1.4189  # maximum steering angle [rad]
         MAX_SPEED = 5  # maximum speed [m/s]
 
         proc_ranges = self.preprocess_lidar(ranges)

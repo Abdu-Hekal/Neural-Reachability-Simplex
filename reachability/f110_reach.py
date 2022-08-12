@@ -16,7 +16,7 @@ theta_min_model = reach.get_theta_min_model()
 theta_max_model = reach.get_theta_max_model()
 
 
-def reachability(oa, odelta, car_num, state, batch, color):
+def reachability(state, oa, odelta, batch, color, car_num):
     """
     Generate reachable sets
 

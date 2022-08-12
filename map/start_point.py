@@ -3,7 +3,7 @@ import random
 
 def get_rand_start_point(raceline, num):
     lines = open(raceline).read().splitlines()
-    line = random.sample(list(enumerate(lines[0:len(lines)])), num)
+    line = random.sample(list(enumerate(lines[3:len(lines)])), num)
 
     return line
 
