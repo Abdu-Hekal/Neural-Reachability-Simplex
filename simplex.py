@@ -115,8 +115,8 @@ class GymRunner(object):
     def check_one_poly_intersection(self, final_reach_poly, poly_index, car_num):
         intersect = False
         reachpoly = shapely_poly(final_reach_poly.V)
-        min_other_car = max(0, poly_index-20)
-        max_other_car = min(49, poly_index+20)
+        min_other_car = max(0, poly_index)
+        max_other_car = min(50, poly_index+1)
         # check intersection with obstacles
         for map_obstacle in self.map_obstacles:
             if reachpoly.intersects(map_obstacle):
