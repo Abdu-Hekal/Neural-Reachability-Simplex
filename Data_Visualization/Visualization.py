@@ -50,7 +50,7 @@ class Datalogger:
 current_path = os.getcwd()
 # Load the correct filename
 # PurePursuit,Stanley, LQR, MPC
-filename = current_path + '/datalogging_MPC.p'
+filename = current_path + '/Data_Visualization/datalogging_MPC.p'
 file_to_read = open(filename, "rb")
 data = pickle.load(file_to_read)
 

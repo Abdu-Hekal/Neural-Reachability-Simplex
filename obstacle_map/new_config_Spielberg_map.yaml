@@ -23,6 +23,11 @@ sx: -0.0440806
 sy:  -0.8491629
 stheta: 3.4034118
 
+#parameters for second car
+sx2: -30.0440806
+sy2:  -7.8491629
+stheta2: 3.4034118
+
 
 # raceline path and indices
 wpt_path: 'map/Spielberg_raceline.csv'
