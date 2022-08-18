@@ -1,9 +1,10 @@
 import random
 
 
-def get_rand_start_point(raceline, num):
+def get_rand_start_point(raceline, num, l=1, h=0):
     lines = open(raceline).read().splitlines()
-    line = random.sample(list(enumerate(lines[3:len(lines)])), num)
+    h = len(lines) if h==0 else h
+    line = random.sample(list(enumerate(lines[l:h])), num)
 
     return line
 

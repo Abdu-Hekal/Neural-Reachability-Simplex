@@ -1,17 +1,17 @@
 class Car:
-    def __init__(self, num=0, mpc_controller=None, ftg_controller=None):
+    def __init__(self, num=0, advanced_controller=None, baseline_controller=None, conf=None):
         self.num = num
         self.control_count = 10
-        self.mpc_controller = mpc_controller
-        self.ftg_controller = ftg_controller
+        self.advanced_controller = advanced_controller
+        self.baseline_controller = baseline_controller
         self.action = None
-        self.future = None
         self.intersect = False
-        self.ftg = False
+        self.baseline = False
         self.reachset = []
-        self.ftg_laptime = 0
+        self.baseline_laptime = 0
         self.vertices_list = []
         self.label = ""
+        self.conf = conf
 
         # Vehicle parameters
         self.LENGTH = 0.58  # Length of the vehicle [m]
@@ -25,8 +25,8 @@ class Car:
 
     def __getstate__(self):
         out = self.__dict__.copy()
-        del out["mpc_controller"]
-        del out["ftg_controller"]
+        del out["advanced_controller"]
+        del out["baseline_controller"]
         del out["vertices_list"]
         return out
     def __setstate__(self, out):

@@ -1,0 +1,20 @@
+# metadata
+run_name: 'intersection'
+logging: 'True'
+# characteristic number for map
+perf_num: 1
+
+# map paths
+map_path: 'custom_maps/maps/intersection'
+map_ext: '.png'
+
+
+# raceline path and indices
+wpt_path: 'custom_maps/maps/intersection_raceline_1.csv'
+wpt_path2: 'custom_maps/maps/intersection_centerline.csv'
+wpt_delim: ';'
+wpt_rowskip: 1
+wpt_xind: 1
+wpt_yind: 2
+wpt_thind: 3
+wpt_vind: 5
