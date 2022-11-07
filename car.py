@@ -29,6 +29,7 @@ class Car:
         del out["baseline_controller"]
         del out["vertices_list"]
         return out
+
     def __setstate__(self, out):
         self.__dict__ = out
 

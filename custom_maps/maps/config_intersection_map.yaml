@@ -10,7 +10,7 @@ map_ext: '.png'
 
 
 # raceline path and indices
-wpt_path: 'custom_maps/maps/intersection_raceline_1.csv'
+wpt_path: 'custom_maps/maps/intersection_raceline_3.csv'
 wpt_path2: 'custom_maps/maps/intersection_centerline.csv'
 wpt_delim: ';'
 wpt_rowskip: 1

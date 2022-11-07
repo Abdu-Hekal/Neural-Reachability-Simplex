@@ -11,7 +11,6 @@ import pickle
 # --------------------------- Controller Paramter ---------------------------
 
 
-
 """ 
 Planner Helpers
 """
@@ -91,6 +90,7 @@ def nearest_point_on_trajectory(point, trajectory):
     min_dist_segment = np.argmin(dists)
     return projections[min_dist_segment], dists[min_dist_segment], t[min_dist_segment], min_dist_segment
 
+
 def get_nparray_from_matrix(x):
     return np.array(x).flatten()
 
@@ -139,7 +139,8 @@ class Controller:
         # MPC parameters
         self.R = np.diag([0.01, 100.0])  # input cost matrix, penalty for inputs - [accel, steer]
         self.Rd = np.diag([0.01, 100.0])  # input difference cost matrix, penalty for change of inputs - [accel, steer]
-        self.Q = np.diag([13.5, 13.5, 5.5, 13.0])  # state cost matrix, for the the next (T) prediction time steps [x, y, v, yaw]
+        self.Q = np.diag(
+            [13.5, 13.5, 5.5, 13.0])  # state cost matrix, for the the next (T) prediction time steps [x, y, v, yaw]
         self.Qf = self.Q
 
         # Iterative paramter
@@ -338,7 +339,7 @@ class Controller:
 
             # Call the Linear MPC Function
             mpc_a, mpc_delta, mpc_x, mpc_y, mpc_yaw, mpc_v = self.linear_mpc_control(ref_path, path_predict, x0,
-                                                                                           dref)
+                                                                                     dref)
 
             # Calculta the u change value
             du = sum(abs(mpc_a - poa)) + sum(abs(mpc_delta - pod))
@@ -369,7 +370,8 @@ class Controller:
             if t != 0:
                 cost += cvxpy.quad_form(ref_traj[:, t] - x[:, t], self.Q)
 
-            A, B, C = Controller.get_linear_model_matrix(self.NX, self.NU, self.DT, self.car.WB,path_predict[2, t], path_predict[3, t], dref[0, t])
+            A, B, C = Controller.get_linear_model_matrix(self.NX, self.NU, self.DT, self.car.WB, path_predict[2, t],
+                                                         path_predict[3, t], dref[0, t])
             constraints += [x[:, t + 1] == A @ x[:, t] + B @ u[:, t] + C]
 
             if t < (self.T - 1):
@@ -420,14 +422,14 @@ class Controller:
 
         # Calculate the next reference trajectory for the next T steps:: [x, y, v, yaw]
         ref_path, self.target_ind, ref_delta = self.calc_ref_trajectory(vehicle_state, cx, cy, cyaw, sp, self.dl,
-                                                                              self.target_ind)
+                                                                        self.target_ind)
 
         # Create State Vector based on current vehicle state: x-position, y-position,  velocity, heading
         x0 = [vehicle_state.x, vehicle_state.y, vehicle_state.v, vehicle_state.yaw]
 
         # Solve the Linear MPC Control problem
         self.oa, self.odelta, ox, oy, oyaw, ov = self.iterative_linear_mpc_control(ref_path, x0, ref_delta,
-                                                                                         self.oa, self.odelta)
+                                                                                   self.oa, self.odelta)
 
         # ------------------- MPC CONTROL Output ---------------------------------
         # Create the final steer and speed parameter that need to be sent out
@@ -440,7 +442,6 @@ class Controller:
         # speed_output=self.oa[0]*T*DT
         # speed_output=ref_path[2][1]*0.50
         speed_output = vehicle_state.v + self.oa[0] * self.DT
-
 
         return speed_output, steer_output
 
@@ -493,11 +494,12 @@ class LatticePlanner:
 
         return speed, steering_angle
 
+
 # -------------------------- MAIN SIMULATION  ----------------------------------------
 
 if __name__ == '__main__':
     # Check CVXP Installations
-    #print(cvxpy.installed_solvers())
+    # print(cvxpy.installed_solvers())
 
     # Load the configuration for the desired Racetrack
     work = {'mass': 3.463388126201571, 'lf': 0.15597534362552312, 'tlad': 0.82461887897713965, 'vgain': 0.80}
@@ -529,10 +531,10 @@ if __name__ == '__main__':
     while not done and env.renderer.alive:
         # Call the function for planning a path, only every 15th timestep
         if control_count == 10:
-
             # Call the function for tracking speed and steering
             # MPC specific: We solve the MPC problem only every 6th timestep of the simultation to decrease the sim time
-            speed, steer = planner.control(obs['poses_x'][0], obs['poses_y'][0], obs['poses_theta'][0],obs['linear_vels_x'][0], path, controller)
+            speed, steer = planner.control(obs['poses_x'][0], obs['poses_y'][0], obs['poses_theta'][0],
+                                           obs['linear_vels_x'][0], path, controller)
             control_count = 0
 
         # Update the simulation environment

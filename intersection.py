@@ -13,6 +13,7 @@ import reachability.f110_reach as reach
 from shapely.geometry import Polygon as shapely_poly
 import multiprocessing as mp
 
+
 class GymRunner(object):
 
     def __init__(self, cars, racelines=None):
@@ -38,6 +39,7 @@ class GymRunner(object):
             idx = 0
             for car in self.cars:
                 raceline = self.racelines[idx]
+                print(raceline)
                 idx = (idx + 1) % len(self.racelines)
                 car.conf.wpt_path = raceline
 
@@ -48,7 +50,8 @@ class GymRunner(object):
             index, point = start_point[0]
             point_array = point.split(";")
             env_array.append([float(point_array[1]), float(point_array[2]), float(point_array[3])])
-            car.advanced_controller.controller.init_target_ind = index
+            car.advanced_controller.controller.init_target_ind = index + 2200
+            print("index should be: ", index + 2200)
         self.obs, self.step_reward, self.done, self.info = self.env.reset(np.array(env_array))
         self.env.render()
 
@@ -65,23 +68,25 @@ class GymRunner(object):
 
     def select_control(self):
         actions = []
-        for index, (car,reach_color)  in enumerate(zip(self.cars,self.colors)):
+        for index, (car, reach_color) in enumerate(zip(self.cars, self.colors)):
             if car.control_count == 10:
                 self.check_intersection(car, index)
                 car.rm_plotted_reach_sets()
                 car.baseline = False
                 speed, steer, state = car.advanced_controller.step(self.obs)
-                car.label = f"MPC: {round(speed,2)} m/s"
+                car.label = f"MPC: {round(speed, 2)} m/s"
                 car.action = [steer, speed]
-                vertices_list, polys = reach.reachability(state, car.advanced_controller.controller.oa, car.advanced_controller.controller.odelta,
-                                                          self.env.renderer.batch, reach_color, car.advanced_controller.num)
+                vertices_list, polys = reach.reachability(state, car.advanced_controller.controller.oa,
+                                                          car.advanced_controller.controller.odelta,
+                                                          self.env.renderer.batch, reach_color,
+                                                          car.advanced_controller.num)
                 car.vertices_list += vertices_list
                 car.reachset = polys
                 car.control_count = 0
             if car.intersect or car.baseline:
                 car.baseline = True
-                speed, steer, state = 0,0,0
-                car.label = f"Stop: {round(speed,2)} m/s"
+                speed, steer, state = 0, 0, 0
+                car.label = f"Stop: {round(speed, 2)} m/s"
                 car.action = [steer, speed]
                 car.baseline_laptime += self.step_reward
 
@@ -113,7 +118,7 @@ class GymRunner(object):
         intersect = False
         reachpoly = shapely_poly(final_reach_poly.V)
         min_other_car = max(0, poly_index)
-        max_other_car = min(50, poly_index+1)
+        max_other_car = min(50, poly_index + 1)
         # check intersection of vehicles with one another
         for x in range(len(self.cars) - 1 - car_num):
             other_car = self.cars[-(x + 1)]
@@ -123,7 +128,6 @@ class GymRunner(object):
                     intersect = True
                     other_car.intersect = True
         return intersect
-
 
     def camera_follow(self, old_cam_point):
         # camera to follow vehicle
@@ -135,7 +139,7 @@ class GymRunner(object):
 
     def end_sim(self, car_num, laptime, ftg_laptime, start):
         print(f"car {car_num} stopping: {round((ftg_laptime / laptime) * 100, 3)}%")
-        print(f"car {car_num} mpc control: {100 - round(((ftg_laptime / laptime) * 100),3)}%")
+        print(f"car {car_num} mpc control: {100 - round(((ftg_laptime / laptime) * 100), 3)}%")
         print('Sim elapsed time:', laptime, 'Real elapsed time:', time.time() - start)
 
     def run(self, zoom, camera_follow):
@@ -160,7 +164,6 @@ class GymRunner(object):
                 pyglet_label.text += f"{car.label}, "
             self.obs, self.step_reward, self.done, self.info = self.env.step(self.actions)
 
-
             if camera_follow:
                 self.camera_follow(old_cam_point)
             laptime += self.step_reward
@@ -184,18 +187,20 @@ if __name__ == '__main__':
     scenario = args['scenario']
 
     cars = []
-    max_speeds = [3,10,3,3]
+    max_speeds = [3, 10, 3, 3]
     for i in range(num):
         car = Car(i, MPC())
         if scenario == 1:
             car.MAX_SPEED = max_speeds[i]
-        elif scenario ==2:
-            car.MAX_SPEED = 4+i/4
+        elif scenario == 2:
+            car.MAX_SPEED = 4 + i / 4
         else:
-            car.MAX_SPEED = random.uniform(3,5)
-        print(f"car {i+1} max speed is {car.MAX_SPEED} m/s")
+            car.MAX_SPEED = random.uniform(3, 5)
+        print(f"car {i + 1} max speed is {car.MAX_SPEED} m/s")
         cars.append(car)
 
-    racelines = ['custom_maps/maps/intersection_raceline_1.csv', 'custom_maps/maps/intersection_raceline_2.csv', 'custom_maps/maps/intersection_raceline_3.csv', 'custom_maps/maps/intersection_raceline_4.csv']
+    racelines = ['custom_maps/maps/intersection_raceline_1.csv', 'custom_maps/maps/intersection_raceline_2.csv',
+                 'custom_maps/maps/intersection_raceline_3.csv', 'custom_maps/maps/intersection_raceline_4.csv']
+    racelines = ['custom_maps/maps/intersection_raceline_2.csv']
     runner = GymRunner(cars, racelines)
     runner.run(zoom, camera_follow)
