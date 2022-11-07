@@ -1,5 +1,4 @@
-import random
-from controllers.new_mpc_tracking import LatticePlanner, Controller, State
+from controllers.mpc_tracking import LatticePlanner, Controller, State
 
 
 class MPC:

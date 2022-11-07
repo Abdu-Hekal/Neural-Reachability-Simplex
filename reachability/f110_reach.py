@@ -27,12 +27,14 @@ def reachability(state, oa, odelta, batch, color, car_num):
     vertices_list = []
     polys = []
     for reach_iter in range(50):  # range(99, -1, -1)
-        final_reach_poly = transform_reachsets(reach_iter, sf_list, theta_min_list[0][reach_iter][0],  theta_max_list[0][reach_iter][0], state)
+        final_reach_poly = transform_reachsets(reach_iter, sf_list, theta_min_list[0][reach_iter][0],
+                                               theta_max_list[0][reach_iter][0], state)
         if final_reach_poly:
             plot_reachset(car_num, final_reach_poly, batch, vertices_list, color)
             polys.append(final_reach_poly)
 
     return vertices_list, polys
+
 
 def compute_reachsets(oa, odelta, state):
     input_list = []
@@ -71,10 +73,10 @@ def plot_reachset(car_num, final_reach_poly, batch, vertices_list, color):
     for vertex in final_reach_poly.V:
         for val in vertex:
             vertices.append(50 * val)
-    background = pyglet.graphics.OrderedGroup(-(car_num+1))
+    background = pyglet.graphics.OrderedGroup(-(car_num + 1))
     howmany = int(len(vertices) / 2)
     colors = color * howmany
 
     vertex_list = batch.add(len(final_reach_poly.V), pyglet.gl.GL_POLYGON, background, ('v2f', vertices),
-                        ('c4B', colors))
+                            ('c4B', colors))
     vertices_list.append(vertex_list)

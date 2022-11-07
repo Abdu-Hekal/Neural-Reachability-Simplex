@@ -50,8 +50,8 @@ class GymRunner(object):
             index, point = start_point[0]
             point_array = point.split(";")
             env_array.append([float(point_array[1]), float(point_array[2]), float(point_array[3])])
-            car.advanced_controller.controller.init_target_ind = index + 2200
-            print("index should be: ", index + 2200)
+            car.advanced_controller.controller.init_target_ind = index+2200
+            print("index should be: ", index+2200)
         self.obs, self.step_reward, self.done, self.info = self.env.reset(np.array(env_array))
         self.env.render()
 
@@ -201,6 +201,5 @@ if __name__ == '__main__':
 
     racelines = ['custom_maps/maps/intersection_raceline_1.csv', 'custom_maps/maps/intersection_raceline_2.csv',
                  'custom_maps/maps/intersection_raceline_3.csv', 'custom_maps/maps/intersection_raceline_4.csv']
-    racelines = ['custom_maps/maps/intersection_raceline_2.csv']
     runner = GymRunner(cars, racelines)
     runner.run(zoom, camera_follow)

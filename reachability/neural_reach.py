@@ -13,6 +13,7 @@ use_cuda = False  # torch.cuda.is_available()
 device = torch.device("cuda:0" if use_cuda else "cpu")
 torch.backends.cudnn.benchmark = True
 
+
 def load_checkpoint(filepath):
     """
    Load trained neural network
