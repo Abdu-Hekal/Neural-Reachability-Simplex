@@ -7,7 +7,7 @@ import yaml
 from argparse import Namespace, ArgumentParser, ArgumentDefaultsHelpFormatter
 
 from car import Car
-from controllers.mpc import MPC
+from controllers.reachset_mpc import ReachsetMPC as MPC
 from map.start_point import get_rand_start_point
 import reachability.f110_reach as reach
 from shapely.geometry import Polygon as shapely_poly
@@ -140,7 +140,6 @@ class GymRunner(object):
     def end_sim(self, car_num, laptime, ftg_laptime, start):
         print(f"car {car_num} stopping: {round((ftg_laptime / laptime) * 100, 3)}%")
         print(f"car {car_num} mpc control: {100 - round(((ftg_laptime / laptime) * 100), 3)}%")
-        print('Sim elapsed time:', laptime, 'Real elapsed time:', time.time() - start)
 
     def run(self, zoom, camera_follow):
         # load map
@@ -171,6 +170,8 @@ class GymRunner(object):
 
         for i, car in enumerate(self.cars):
             self.end_sim(i + 1, laptime, car.baseline_laptime, start)
+        print('Sim elapsed time:', laptime, 'Real elapsed time:', time.time() - start)
+
 
 
 if __name__ == '__main__':

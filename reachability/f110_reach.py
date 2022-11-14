@@ -16,31 +16,33 @@ theta_min_model = reach.get_theta_min_model()
 theta_max_model = reach.get_theta_max_model()
 
 
-def reachability(state, oa, odelta, batch, color, car_num):
+def reachability(state, oa, odelta, batch=None, color=None, car_num=0, time_horizon=0.5, plot=True):
     """
     Generate reachable sets
 
    """
 
-    sf_list, theta_min_list, theta_max_list = compute_reachsets(oa, odelta, state)
+    sf_list, theta_min_list, theta_max_list = compute_reachsets(oa, odelta, state, time_horizon)
 
     vertices_list = []
     polys = []
-    for reach_iter in range(50):  # range(99, -1, -1)
+    for reach_iter in range(int(time_horizon/0.01)):  # range(99, -1, -1)
         final_reach_poly = transform_reachsets(reach_iter, sf_list, theta_min_list[0][reach_iter][0],
                                                theta_max_list[0][reach_iter][0], state)
+
         if final_reach_poly:
-            plot_reachset(car_num, final_reach_poly, batch, vertices_list, color)
             polys.append(final_reach_poly)
+            if plot:
+                plot_reachset(car_num, final_reach_poly, batch, vertices_list, color)
 
     return vertices_list, polys
 
 
-def compute_reachsets(oa, odelta, state):
+def compute_reachsets(oa, odelta, state, time_horizon=0.5):
     input_list = []
     pyglet.gl.glEnable(pyglet.gl.GL_BLEND)
     pyglet.gl.glBlendFunc(pyglet.gl.GL_SRC_ALPHA, pyglet.gl.GL_ONE_MINUS_SRC_ALPHA)
-    for i in range(50):
+    for i in range(int(time_horizon/0.01)):
         nn_input = [i + 1, oa[0], odelta[0], oa[1], odelta[1], oa[2], odelta[2], oa[3], odelta[3], oa[4],
                     odelta[4],
                     state.v]

@@ -17,6 +17,7 @@ from shapely.geometry import Polygon as shapely_poly
 import multiprocessing as mp
 import copy
 
+
 class GymRunner(object):
 
     def __init__(self, cars, map_obstacles):
@@ -45,7 +46,7 @@ class GymRunner(object):
     def setup_start_points(self):
         start_points = get_rand_start_point(self.conf.wpt_path, len(self.cars))
         env_array = []
-        for start_point, car in zip(start_points,self.cars):
+        for start_point, car in zip(start_points, self.cars):
             index, point = start_point
             point_array = point.split(";")
             env_array.append([float(point_array[1]), float(point_array[2]), float(point_array[3])])
@@ -64,7 +65,7 @@ class GymRunner(object):
 
     def select_control(self):
         actions = []
-        for index, (car,reach_color)  in enumerate(zip(self.cars,self.colors)):
+        for index, (car, reach_color) in enumerate(zip(self.cars, self.colors)):
             if car.control_count == 10:
                 self.check_intersection(car, index)
                 car.rm_plotted_reach_sets()
@@ -72,15 +73,18 @@ class GymRunner(object):
                 car.label = "MPC"
                 speed, steer, state = car.advanced_controller.step(self.obs)
                 car.action = [steer, speed]
-                vertices_list, polys = reach.reachability(state, car.advanced_controller.controller.oa, car.advanced_controller.controller.odelta,
-                                                          self.env.renderer.batch, reach_color, car.advanced_controller.num)
+                vertices_list, polys = reach.reachability(state, car.advanced_controller.controller.oa,
+                                                          car.advanced_controller.controller.odelta,
+                                                          self.env.renderer.batch, reach_color,
+                                                          car.advanced_controller.num)
                 car.vertices_list += vertices_list
                 car.reachset = polys
                 car.control_count = 0
             if car.intersect or car.baseline:
                 car.baseline = True
                 car.label = "FTG"
-                speed, steer, state = car.baseline_controller.process_lidar(self.obs['scans'][index], MAX_SPEED=car.MAX_SPEED)
+                speed, steer, state = car.baseline_controller.process_lidar(self.obs['scans'][index],
+                                                                            MAX_SPEED=car.MAX_SPEED)
                 car.action = [steer, speed]
                 car.baseline_laptime += self.step_reward
 
@@ -108,12 +112,11 @@ class GymRunner(object):
             intersect.append(self.check_one_poly_intersection(final_reach_poly, poly_index, car_num))
         car.intersect = any(intersect)
 
-
     def check_one_poly_intersection(self, final_reach_poly, poly_index, car_num):
         intersect = False
         reachpoly = shapely_poly(final_reach_poly.V)
         min_other_car = max(0, poly_index)
-        max_other_car = min(50, poly_index+1)
+        max_other_car = min(50, poly_index + 1)
         # check intersection with obstacles
         for map_obstacle in self.map_obstacles:
             if reachpoly.intersects(map_obstacle):
@@ -128,7 +131,6 @@ class GymRunner(object):
                     other_car.intersect = True
         return intersect
 
-
     def camera_follow(self, old_cam_point):
         # camera to follow vehicle
         camera_point = [self.obs['poses_x'][0] - old_cam_point[0], self.obs['poses_y'][0] - old_cam_point[1]]
@@ -139,7 +141,7 @@ class GymRunner(object):
 
     def end_sim(self, car_num, laptime, ftg_laptime, start):
         print(f"car {car_num} follow the gap control: {round((ftg_laptime / laptime) * 100, 3)}%")
-        print(f"car {car_num} mpc control: {100 - round(((ftg_laptime / laptime) * 100),3)}%")
+        print(f"car {car_num} mpc control: {100 - round(((ftg_laptime / laptime) * 100), 3)}%")
         print('Sim elapsed time:', laptime, 'Real elapsed time:', time.time() - start)
 
     def run(self, zoom):
@@ -173,12 +175,12 @@ class GymRunner(object):
             # if self.env.lap_counts[0] == 1:
             #     break;
 
-
         for i, car in enumerate(self.cars):
             self.end_sim(i + 1, laptime, car.baseline_laptime, start)
 
+
 def my_try(z, x):
-    return x*2
+    return x * 2
 
 
 if __name__ == '__main__':
@@ -202,8 +204,8 @@ if __name__ == '__main__':
     cars = []
     for i in range(num):
         car = Car(i, MPC(), GapFollower())
-        car.MAX_SPEED = random.uniform(3,5)
-        print(f"car {i+1} max speed is {car.MAX_SPEED} m/s")
+        car.MAX_SPEED = random.uniform(3, 5)
+        print(f"car {i + 1} max speed is {car.MAX_SPEED} m/s")
         cars.append(car)
 
     pool = mp.Pool(mp.cpu_count())
@@ -211,4 +213,3 @@ if __name__ == '__main__':
     runner.run(zoom)
     pool.close()
     pool.join()
-

@@ -14,10 +14,17 @@ class MPC:
         self.path = self.planner.plan()
         self.num = car.num
 
-    def step(self, obs):
+    def get_state(self, obs):
         state = State(x=obs['poses_x'][self.num], y=obs['poses_y'][self.num], yaw=obs['poses_theta'][self.num],
                       v=obs['linear_vels_x'][self.num])
-        speed, steer = self.planner.control(obs['poses_x'][self.num], obs['poses_y'][self.num], obs['poses_theta'][self.num],
-                                            obs['linear_vels_x'][self.num], self.path, self.controller)
+        return state
+
+    def get_control_action(self, obs):
+        state = self.get_state(obs)
+        speed, steer = self.planner.control(state.x, state.y, state.yaw,
+                                            state.v, self.path, self.controller)
 
         return speed, steer, state
+
+    def step(self, obs):
+        return self.get_control_action(obs)
