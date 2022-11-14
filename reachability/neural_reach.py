@@ -55,12 +55,8 @@ def get_reachset(inputs_list, models):
     Compute untransformed reachable set based on input and bloat the output to bias for overapproximation
    """
     sf_list = []
-    # test data for initial region as shown in JuliaReach documentation
-    x = inputs_list
-
-    for i in range(8):
-        rnn_forward = models[i][0].forward(x.float().view(1, len(x), 12))
-        val = models[i][1].forward(rnn_forward[0])
+    for model in models:
+        val = get_vals(inputs_list, model)
         val = val.add(0.1)  # bloating
         val = val.tolist()
         sf_list.append(val)
@@ -88,7 +84,7 @@ def sf_to_poly(sf):
     return Poly
 
 
-def get_theta_min_list(inputs_list, model):
+def get_vals(inputs_list, model):
     """
    Get list of minimum orientations for each reach image
    """
@@ -96,21 +92,6 @@ def get_theta_min_list(inputs_list, model):
 
     rnn_forward = model[0].forward(x.float().view(1, len(x), 12))
     vals = model[1].forward(rnn_forward[0])
-    vals = vals.tolist()
-
-    return vals
-
-
-def get_theta_max_list(inputs_list, model_optim):
-    """
-   Get list of maximum orientations for each reach image
-   """
-    # test data for initial region as shown in JuliaReach documentation
-    x = inputs_list
-
-    rnn_forward = model_optim[0].forward(x.float().view(1, len(x), 12))
-    vals = model_optim[1].forward(rnn_forward[0])
-    vals = vals.tolist()
 
     return vals
 
@@ -123,5 +104,17 @@ def get_theta_min_model():
 
 def get_theta_max_model():
     file = 'reachability/bicyclemodels/0.5s_mpc/0.5s_mpc_theta_max_model.pth'
+    model_optim = load_checkpoint(file)
+    return model_optim
+
+
+def get_vel_min_model():
+    file = 'reachability/bicyclemodels/0.5s_mpc/0.5s_mpc_v_min_model.pth'
+    model_optim = load_checkpoint(file)
+    return model_optim
+
+
+def get_vel_max_model():
+    file = 'reachability/bicyclemodels/0.5s_mpc/0.5s_mpc_v_max_model.pth'
     model_optim = load_checkpoint(file)
     return model_optim
