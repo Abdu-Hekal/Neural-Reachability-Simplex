@@ -84,6 +84,10 @@ Bibtex:
 
 ## Installation Issues
 
+There are two common installation issues, the first related to the `pycddlib` library required by `pytope` and the second related to rendering with `f1tenth_gym`
+
+### pycddlib
+
 When installing requirements which installs `pycddlib`, a common issue arises when the installation process fails to locate the `gmp.h` header file. This file is essential as it contains declarations necessary for using the GNU Multiple Precision Arithmetic Library (GMP). 
 
 To resolve this issue, you can set environment variables that point the compiler (`clang` or `gcc`) to the directory where `gmp.h` is located. Here's how you can do it:
@@ -123,12 +127,21 @@ To resolve this issue, you can set environment variables that point the compiler
    pip install pycddlib
    ```
 
+### f1tenth_gym
    
 Another common installation issue is related to installation of f1tenth_gym.
 On MacOS Big Sur and above, you may encounter this error:
+
 ```bash
 ImportError: Can't find framework /System/Library/Frameworks/OpenGL.framework.
 ```
+
+or 
+
+```bash
+AttributeError: 'Batch' object has no attribute 'add'
+```
+
 
 The error can be fixed by installing this version of pyglet:
 ```bash
