@@ -59,7 +59,7 @@ Additionally, `simplex.py` supports the following command-line arguments:
 
 - `-z` or `--zoom`: Zoom in the camera.
 - `-n <number>` or `--number <number>`: Number of vehicles (default is 1).
-- `-o <obstacles>` or `--obstacles <obstacles>`: Number of obstacles (default is 10).
+- `-o <obstacles>` or `--obstacles <obstacles>`: Number of obstacles (default is 5).
 
 
 ## Citation

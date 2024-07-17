@@ -1,0 +1,4 @@
+cvxpy
+torch
+pytope
+shapely

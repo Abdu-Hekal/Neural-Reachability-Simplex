@@ -206,7 +206,7 @@ if __name__ == '__main__':
     cars = []
     for i in range(num):
         car = Car(i, MPC(), GapFollower())
-        car.MAX_SPEED = random.uniform(3,5)
+        car.MAX_SPEED = random.uniform(2,3)
         print(f"car {i+1} max speed is {car.MAX_SPEED} m/s")
         cars.append(car)
 
