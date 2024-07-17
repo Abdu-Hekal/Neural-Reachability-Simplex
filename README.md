@@ -19,13 +19,29 @@ Neural-Reachability is a framework for neural network-based reachability analysi
 
 ## Prerequisites
 
+- **Python(<3.12)** - Install Python strictly less than version 3.12.
+
 
 ## Installation
 
-Clone the repository and install the required dependencies:
+Clone the repository:
 
 ```bash
 git clone https://github.com/Abdu-Hekal/Neural-Reachability-Simplex.git
+```
+
+Install the f1tenth_gym environment shipped with the repository:
+
+```bash
+cd Neural-Reachability-Simplex/f1tenth_gym
+pip install .
+cd ..
+```
+
+Install requirements:
+
+```bash
+pip install -r requirements.txt
 ```
 
 
@@ -34,10 +50,16 @@ git clone https://github.com/Abdu-Hekal/Neural-Reachability-Simplex.git
 From the terminal, run:
 
 ```bash
-
+python simplex.py
 ```
 
-to ...
+to render an f1tenth simulation of vehicle(s) racing around a track with static obstacles. Each vehicle has a simplex controller governed by a neural reachability decision module.
+
+Additionally, `simplex.py` supports the following command-line arguments:
+
+- `-z` or `--zoom`: Zoom in the camera.
+- `-n <number>` or `--number <number>`: Number of vehicles (default is 1).
+- `-o <obstacles>` or `--obstacles <obstacles>`: Number of obstacles (default is 10).
 
 
 ## Citation
@@ -102,6 +124,17 @@ To resolve this issue, you can set environment variables that point the compiler
    ```
 
    
+Another common installation issue is related to installation of f1tenth_gym.
+On MacOS Big Sur and above, you may encounter this error:
+```bash
+ImportError: Can't find framework /System/Library/Frameworks/OpenGL.framework.
+```
+
+The error can be fixed by installing this version of pyglet:
+```bash
+pip install pyglet==1.5.20
+```
+
 
 
    
