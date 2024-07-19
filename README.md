@@ -62,7 +62,7 @@ Additionally, `simplex.py` supports the following command-line arguments:
 - `-n <number>` or `--number <number>`: Number of vehicles (default is 1).
 - `-o <obstacles>` or `--obstacles <obstacles>`: Number of obstacles (default is 5).
 
-## Usage
+## Example
 
 See the following example visualizing a vehicle avoiding an obstacle detected by the neural reachability module. Once the predicted reachable sets of the system (green) intersect with the obstacle, the decision module switches from the advanced model predictive controller, to the base controller (Follow the Gap).
 
